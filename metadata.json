@@ -1,0 +1,6 @@
+{
+  "name": "KDP Orbit",
+  "description": "Production-grade Amazon KDP intelligence and publishing platform with keyword research, niche analysis, and cover designer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
