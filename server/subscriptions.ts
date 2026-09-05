@@ -1,84 +1,40 @@
-import express, { Request, Response } from 'express';
-import { requireAuth, requireAdmin, AuthenticatedRequest } from './auth.ts';
-import { db } from './db.ts';
+import express, { Request, Response } from "express";
+import { requireAuth, requireAdmin, AuthenticatedRequest } from "./auth.ts";
+import { db } from "./db.ts";
+import { PRICING_CONFIG, type PricingPlan } from "../src/config/pricing.ts";
 
 export const subscriptionsRouter = express.Router();
 
-export type BillingCycle = 'monthly' | 'yearly' | 'lifetime' | 'none';
+export type BillingCycle = "monthly" | "yearly" | "lifetime" | "none";
 
-export interface SubscriptionPlan {
+export interface SubscriptionPlan extends PricingPlan {
   id: string;
   name: string;
-  monthlyPriceUSD: number;
-  yearlyPriceUSD: number;
+  currency: PricingPlan["currency"];
+  prices: PricingPlan["prices"];
   features: Record<string, boolean>;
-  limits: Record<string, number>;
+  usageLimits: Record<string, number>;
 }
 
-export const availablePlans: SubscriptionPlan[] = [
-  {
-    id: 'free_starter',
-    name: 'Free',
-    monthlyPriceUSD: 0,
-    yearlyPriceUSD: 0,
-    features: {
-      canExportCover: false,
-      aiAssistant: false,
-      premiumMetrics: false,
-    },
-    limits: {
-      keywordSearches: 15,
-      nicheQueries: 5,
-      aiCredits: 5,
-      coverExports: 2,
-    }
-  },
-  {
-    id: 'author_pro',
-    name: 'Premium',
-    monthlyPriceUSD: 14.99,
-    yearlyPriceUSD: 149.99,
-    features: {
-      canExportCover: true,
-      aiAssistant: true,
-      premiumMetrics: true,
-    },
-    limits: {
-      keywordSearches: 250,
-      nicheQueries: 100,
-      aiCredits: 150,
-      coverExports: 25,
-    }
-  },
-  {
-    id: 'publisher_elite',
-    name: 'Elite',
-    monthlyPriceUSD: 34.99,
-    yearlyPriceUSD: 349.99,
-    features: {
-      canExportCover: true,
-      aiAssistant: true,
-      premiumMetrics: true,
-    },
-    limits: {
-      keywordSearches: 1000,
-      nicheQueries: 500,
-      aiCredits: 1000,
-      coverExports: 100,
-    }
-  }
-];
+export const availablePlans: SubscriptionPlan[] = PRICING_CONFIG.plans.map(
+  (plan) => ({
+    ...plan,
+    usageLimits: { ...plan.usageLimits },
+    features: { ...plan.features },
+    prices: { ...plan.prices },
+  }),
+);
 
 export function resolveUserEntitlements(userId: string) {
   const billingInfo = db.billingRecords.get(userId);
-  
+
   if (!billingInfo) {
     // Return default free tier if no billing record exists
     return {
-      planId: 'free_starter',
+      planId: "free_starter",
       features: availablePlans[0].features,
-      limits: availablePlans[0].limits,
-      specialAccess: []
+      limits: availablePlans[0].usageLimits,
+      specialAccess: [],
     };
   }
 
@@ -98,32 +54,35 @@ export function resolveUserEntitlements(userId: string) {
       billingInfo.earlyAccessExpiresAt = null;
       billingInfo.auditLog.push({
         date: new Date().toISOString(),
-        action: 'EARLY_ACCESS_EXPIRED',
-        details: 'Early access automatically expired.'
+        action: "EARLY_ACCESS_EXPIRED",
+        details: "Early access automatically expired.",
       });
     }
   }
 
-  const basePlan = availablePlans.find(p => p.id === billingInfo.planId) || availablePlans[0];
-  
+  const basePlan =
+    availablePlans.find((p) => p.id === billingInfo.planId) ||
+    availablePlans[0];
+
   const features = { ...basePlan.features };
-  const limits = { ...basePlan.limits };
+  const limits = { ...basePlan.usageLimits };
   const specialAccess = [];
 
-  const hasSpecialAccess = billingInfo.promotionalAccess || 
-                           billingInfo.lifetimeAccess || 
-                           billingInfo.partnerAccount || 
-                           billingInfo.adminGrantedAccess || 
-                           billingInfo.earlyAdopterAccess ||
-                           hasValidEarlyAccess;
+  const hasSpecialAccess =
+    billingInfo.promotionalAccess ||
+    billingInfo.lifetimeAccess ||
+    billingInfo.partnerAccount ||
+    billingInfo.adminGrantedAccess ||
+    billingInfo.earlyAdopterAccess ||
+    hasValidEarlyAccess;
 
   if (hasSpecialAccess) {
-    if (billingInfo.promotionalAccess) specialAccess.push('promotional');
-    if (billingInfo.lifetimeAccess) specialAccess.push('lifetime');
-    if (billingInfo.partnerAccount) specialAccess.push('partner');
-    if (billingInfo.adminGrantedAccess) specialAccess.push('admin_granted');
-    if (billingInfo.earlyAdopterAccess) specialAccess.push('early_adopter');
-    if (hasValidEarlyAccess) specialAccess.push('early_access');
+    if (billingInfo.promotionalAccess) specialAccess.push("promotional");
+    if (billingInfo.lifetimeAccess) specialAccess.push("lifetime");
+    if (billingInfo.partnerAccount) specialAccess.push("partner");
+    if (billingInfo.adminGrantedAccess) specialAccess.push("admin_granted");
+    if (billingInfo.earlyAdopterAccess) specialAccess.push("early_adopter");
+    if (hasValidEarlyAccess) specialAccess.push("early_access");
 
     // Override features for special access users
     features.canExportCover = true;
@@ -141,22 +100,25 @@ export function resolveUserEntitlements(userId: string) {
     planId: basePlan.id,
     features,
     limits,
-    specialAccess
+    specialAccess,
   };
 }
 
-subscriptionsRouter.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user!.id;
-  const billingInfo = db.billingRecords.get(userId);
-  const entitlements = resolveUserEntitlements(userId);
-  
-  res.json({
-    success: true,
-    data: {
-      billing: billingInfo || null,
-      entitlements,
-      availablePlans
-    }
-  });
-});
+subscriptionsRouter.get(
+  "/me",
+  requireAuth,
+  (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user!.id;
+    const billingInfo = db.billingRecords.get(userId);
+    const entitlements = resolveUserEntitlements(userId);
 
+    res.json({
+      success: true,
+      data: {
+        billing: billingInfo || null,
+        entitlements,
+        availablePlans,
+      },
+    });
+  },
+);

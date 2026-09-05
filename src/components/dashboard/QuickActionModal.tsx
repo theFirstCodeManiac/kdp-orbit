@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   X,
   Search,
@@ -10,10 +10,11 @@ import {
   CheckCircle2,
   TrendingUp,
   Loader2,
-} from 'lucide-react';
-import { useAuth } from '@/src/context/AuthContext.tsx';
+} from "lucide-react";
+import { useAuth } from "@/src/context/AuthContext.tsx";
+import { analytics } from "@/src/services/analytics/analytics.ts";
 
-export type QuickActionType = 'keyword' | 'niche' | 'book' | 'cover' | 'ai';
+export type QuickActionType = "keyword" | "niche" | "book" | "cover" | "ai";
 
 interface QuickActionModalProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 }) => {
   const { token, user } = useAuth();
   const [actionType, setActionType] = useState<QuickActionType>(initialAction);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
@@ -49,76 +50,80 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     }
   > = {
     keyword: {
-      title: 'Research a Keyword',
+      title: "Research a Keyword",
       icon: <Search className="h-5 w-5 text-emerald-600" />,
       description:
-        'Audit Amazon search volume, customer purchase intent, competition levels, and CPC bids.',
-      placeholder: 'e.g., swear word coloring book for nurses, logic puzzles for adults...',
-      primaryButtonText: 'Run Keyword Analysis',
+        "Audit Amazon search volume, customer purchase intent, competition levels, and CPC bids.",
+      placeholder:
+        "e.g., swear word coloring book for nurses, logic puzzles for adults...",
+      primaryButtonText: "Run Keyword Analysis",
       sampleSuggestions: [
-        'african folktales kids coloring book',
-        'bible study journal for women 2026',
-        'cryptic crossword large print seniors',
-        'adhd daily planner spiral bound',
+        "african folktales kids coloring book",
+        "bible study journal for women 2026",
+        "cryptic crossword large print seniors",
+        "adhd daily planner spiral bound",
       ],
-      badge: 'Amazon US & UK Live Index',
+      badge: "Amazon US & UK Live Index",
     },
     niche: {
-      title: 'Find a Niche',
+      title: "Find a Niche",
       icon: <Compass className="h-5 w-5 text-blue-600" />,
       description:
-        'Discover high-margin, low-competition subcategories with high indie author success rates.',
-      placeholder: 'e.g., Children Activity Books, Christian Living, Puzzles & Games...',
-      primaryButtonText: 'Explore Niche Subcategories',
+        "Discover high-margin, low-competition subcategories with high indie author success rates.",
+      placeholder:
+        "e.g., Children Activity Books, Christian Living, Puzzles & Games...",
+      primaryButtonText: "Explore Niche Subcategories",
       sampleSuggestions: [
-        'Children Folklore & Geography',
-        'Men Spiritual Growth & Prayer',
-        'Language Learning Flashcards',
-        'Self-Care & Mindful Journals',
+        "Children Folklore & Geography",
+        "Men Spiritual Growth & Prayer",
+        "Language Learning Flashcards",
+        "Self-Care & Mindful Journals",
       ],
-      badge: 'Niche Opportunity Score',
+      badge: "Niche Opportunity Score",
     },
     book: {
-      title: 'Research a Book or ASIN',
+      title: "Research a Book or ASIN",
       icon: <BookOpen className="h-5 w-5 text-purple-600" />,
       description:
-        'Reverse-engineer top Amazon bestseller BSR, estimated daily royalties, and keyword rankings.',
-      placeholder: 'Enter Amazon ASIN (e.g. B08F1V4W9K) or exact Book Title...',
-      primaryButtonText: 'Inspect Book Royalties',
+        "Reverse-engineer top Amazon bestseller BSR, estimated daily royalties, and keyword rankings.",
+      placeholder: "Enter Amazon ASIN (e.g. B08F1V4W9K) or exact Book Title...",
+      primaryButtonText: "Inspect Book Royalties",
       sampleSuggestions: [
-        'B08F1V4W9K (Bestselling Devotional)',
-        'B097C2V9K1 (Anxiety Relief Adult Coloring)',
-        'Atomic Habits Paperback Edition',
+        "B08F1V4W9K (Bestselling Devotional)",
+        "B097C2V9K1 (Anxiety Relief Adult Coloring)",
+        "Atomic Habits Paperback Edition",
       ],
-      badge: 'BSR & Royalty Reverse-Engine',
+      badge: "BSR & Royalty Reverse-Engine",
     },
     cover: {
-      title: 'Create a KDP Cover Project',
+      title: "Create a KDP Cover Project",
       icon: <Palette className="h-5 w-5 text-amber-600" />,
       description:
-        'Generate exact KDP-ready cover dimensions with calculated spine width, bleeds, and safety margins.',
-      placeholder: 'Book title (e.g., African Animal Fables & Activity Book)...',
-      primaryButtonText: 'Start Cover Project',
+        "Generate exact KDP-ready cover dimensions with calculated spine width, bleeds, and safety margins.",
+      placeholder:
+        "Book title (e.g., African Animal Fables & Activity Book)...",
+      primaryButtonText: "Start Cover Project",
       sampleSuggestions: [
-        'West African Tales: 8.5 x 11 in (84 pages)',
-        'War Room Devotional: 6 x 9 in (140 pages)',
-        'Senior Logic Grids: 8.5 x 11 in (200 pages)',
+        "West African Tales: 8.5 x 11 in (84 pages)",
+        "War Room Devotional: 6 x 9 in (140 pages)",
+        "Senior Logic Grids: 8.5 x 11 in (200 pages)",
       ],
-      badge: 'KDP Print Dimension Calc',
+      badge: "KDP Print Dimension Calc",
     },
     ai: {
-      title: 'Ask KDP AI Publishing Assistant',
+      title: "Ask KDP AI Publishing Assistant",
       icon: <Sparkles className="h-5 w-5 text-indigo-600" />,
       description:
-        'Get instant algorithmic recommendations on subtitle formatting, back-cover blurb copywriting, or 7 KDP backend keyword boxes.',
-      placeholder: 'e.g., Give me 7 high-CTR backend keywords for an African kids coloring book...',
-      primaryButtonText: 'Consult KDP AI Intelligence',
+        "Get instant algorithmic recommendations on subtitle formatting, back-cover blurb copywriting, or 7 KDP backend keyword boxes.",
+      placeholder:
+        "e.g., Give me 7 high-CTR backend keywords for an African kids coloring book...",
+      primaryButtonText: "Consult KDP AI Intelligence",
       sampleSuggestions: [
-        'Give me 7 backend keyword combinations for adult coloring books',
-        'Suggest 5 high-converting subtitle formulas for prayer journals',
-        'What pricing yields the highest 70% royalty on Amazon US?',
+        "Give me 7 backend keyword combinations for adult coloring books",
+        "Suggest 5 high-converting subtitle formulas for prayer journals",
+        "What pricing yields the highest 70% royalty on Amazon US?",
       ],
-      badge: 'Gemini KDP Intelligence',
+      badge: "Gemini KDP Intelligence",
     },
   };
 
@@ -132,10 +137,10 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     setResultMessage(null);
 
     try {
-      const res = await fetch('/api/dashboard/quick-action', {
-        method: 'POST',
+      const res = await fetch("/api/dashboard/quick-action", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
@@ -145,12 +150,31 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
       });
 
       if (res.ok) {
-        setResultMessage(`Search recorded: "${query.trim()}". Dashboard updated.`);
+        setResultMessage(
+          `Search recorded: "${query.trim()}". Dashboard updated.`,
+        );
+        const eventMap = {
+          keyword: "search_performed",
+          niche: "niche_viewed",
+          book: "book_analyzed",
+          cover: "cover_created",
+          ai: "ai_request_made",
+        } as const;
+
+        analytics.track(
+          eventMap[actionType],
+          {
+            source: "quick_action",
+            action_type: actionType,
+          },
+          user?.id,
+        );
+
         setTimeout(() => {
           onActionComplete();
           onClose();
           setResultMessage(null);
-          setQuery('');
+          setQuery("");
         }, 1200);
       }
     } catch (err) {
@@ -173,8 +197,12 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               {currentConfig.icon}
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">{currentConfig.title}</h2>
-              <span className="text-[11px] font-medium text-slate-500">{currentConfig.badge}</span>
+              <h2 className="text-base font-bold text-slate-900">
+                {currentConfig.title}
+              </h2>
+              <span className="text-[11px] font-medium text-slate-500">
+                {currentConfig.badge}
+              </span>
             </div>
           </div>
           <button
@@ -190,13 +218,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <button
             type="button"
             onClick={() => {
-              setActionType('keyword');
+              setActionType("keyword");
               setResultMessage(null);
             }}
             className={`py-2.5 text-center transition flex items-center justify-center gap-1.5 ${
-              actionType === 'keyword'
-                ? 'bg-white font-semibold text-emerald-700 border-b-2 border-emerald-600'
-                : 'hover:bg-slate-200/50'
+              actionType === "keyword"
+                ? "bg-white font-semibold text-emerald-700 border-b-2 border-emerald-600"
+                : "hover:bg-slate-200/50"
             }`}
           >
             <Search className="h-3.5 w-3.5" />
@@ -205,13 +233,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <button
             type="button"
             onClick={() => {
-              setActionType('niche');
+              setActionType("niche");
               setResultMessage(null);
             }}
             className={`py-2.5 text-center transition flex items-center justify-center gap-1.5 ${
-              actionType === 'niche'
-                ? 'bg-white font-semibold text-blue-700 border-b-2 border-blue-600'
-                : 'hover:bg-slate-200/50'
+              actionType === "niche"
+                ? "bg-white font-semibold text-blue-700 border-b-2 border-blue-600"
+                : "hover:bg-slate-200/50"
             }`}
           >
             <Compass className="h-3.5 w-3.5" />
@@ -220,13 +248,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <button
             type="button"
             onClick={() => {
-              setActionType('book');
+              setActionType("book");
               setResultMessage(null);
             }}
             className={`py-2.5 text-center transition flex items-center justify-center gap-1.5 ${
-              actionType === 'book'
-                ? 'bg-white font-semibold text-purple-700 border-b-2 border-purple-600'
-                : 'hover:bg-slate-200/50'
+              actionType === "book"
+                ? "bg-white font-semibold text-purple-700 border-b-2 border-purple-600"
+                : "hover:bg-slate-200/50"
             }`}
           >
             <BookOpen className="h-3.5 w-3.5" />
@@ -235,13 +263,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <button
             type="button"
             onClick={() => {
-              setActionType('cover');
+              setActionType("cover");
               setResultMessage(null);
             }}
             className={`py-2.5 text-center transition flex items-center justify-center gap-1.5 ${
-              actionType === 'cover'
-                ? 'bg-white font-semibold text-amber-700 border-b-2 border-amber-600'
-                : 'hover:bg-slate-200/50'
+              actionType === "cover"
+                ? "bg-white font-semibold text-amber-700 border-b-2 border-amber-600"
+                : "hover:bg-slate-200/50"
             }`}
           >
             <Palette className="h-3.5 w-3.5" />
@@ -250,13 +278,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <button
             type="button"
             onClick={() => {
-              setActionType('ai');
+              setActionType("ai");
               setResultMessage(null);
             }}
             className={`py-2.5 text-center transition flex items-center justify-center gap-1.5 ${
-              actionType === 'ai'
-                ? 'bg-white font-semibold text-indigo-700 border-b-2 border-indigo-600'
-                : 'hover:bg-slate-200/50'
+              actionType === "ai"
+                ? "bg-white font-semibold text-indigo-700 border-b-2 border-indigo-600"
+                : "hover:bg-slate-200/50"
             }`}
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -266,7 +294,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <p className="text-xs text-slate-600 leading-relaxed">{currentConfig.description}</p>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            {currentConfig.description}
+          </p>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -285,7 +315,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           {/* Preset Prompts / Clickable Suggestions */}
           <div>
             <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-slate-400" /> Suggested Prompts & Live Lookups
+              <TrendingUp className="h-3 w-3 text-slate-400" /> Suggested
+              Prompts & Live Lookups
             </div>
             <div className="flex flex-wrap gap-1.5">
               {currentConfig.sampleSuggestions.map((sample, idx) => (

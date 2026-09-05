@@ -1,23 +1,77 @@
-import React, { useState, useEffect } from 'react';
-import { useSubscription } from '@/src/context/SubscriptionContext.tsx';
-import { Check, Star, Zap, Crown, Loader2, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useSubscription } from "@/src/context/SubscriptionContext.tsx";
+import { useAuth } from "@/src/context/AuthContext.tsx";
+import { analytics } from "@/src/services/analytics/analytics.ts";
+import { Check, Star, Zap, Crown, Loader2, ArrowRight } from "lucide-react";
+import {
+  formatMoney,
+  convertUsdToCurrency,
+  getLocaleForRegion,
+} from "@/src/config/i18n.ts";
 
 export const SubscriptionView: React.FC = () => {
-  const { entitlements, billing, availablePlans, isLoading, checkoutPlan, grantEarlyAccess, grantLifetimePartner } = useSubscription();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+  const {
+    entitlements,
+    billing,
+    availablePlans,
+    isLoading,
+    checkoutPlan,
+    grantEarlyAccess,
+    grantLifetimePartner,
+  } = useSubscription();
+  const { user } = useAuth();
+  const locale = getLocaleForRegion(user?.country || "NG");
+  const formatPlanPrice = (amountUsd: number) =>
+    formatMoney(convertUsdToCurrency(amountUsd, "NGN"), "NGN", locale);
+  const getPlanPrice = (
+    plan: { currency: string; prices: Record<string, number> },
+    cycle: "monthly" | "yearly",
+  ) => {
+    const value = plan.prices[cycle] ?? plan.prices.monthly ?? 0;
+    return plan.currency === "NGN"
+      ? value
+      : convertUsdToCurrency(value, plan.currency as "USD" | "NGN" | "GBP");
+  };
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">(
+    "yearly",
+  );
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancelled' | 'failed' | 'error' | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<
+    "success" | "cancelled" | "failed" | "error" | null
+  >(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const payment = params.get('payment');
+    const payment = params.get("payment");
     if (payment) {
       setPaymentStatus(payment as any);
       // Clean up URL without refreshing
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
-  
+
+  useEffect(() => {
+    if (paymentStatus === "success") {
+      analytics.track(
+        "subscription_started",
+        {
+          source: "checkout_success",
+        },
+        user?.id,
+      );
+    }
+
+    if (paymentStatus === "cancelled") {
+      analytics.track(
+        "subscription_cancelled",
+        {
+          source: "checkout_cancelled",
+        },
+        user?.id,
+      );
+    }
+  }, [paymentStatus, user?.id]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -38,8 +92,10 @@ export const SubscriptionView: React.FC = () => {
   };
 
   const getPlanIcon = (name: string) => {
-    if (name.toLowerCase().includes('free')) return <Star className="w-5 h-5 text-slate-400" />;
-    if (name.toLowerCase().includes('premium')) return <Zap className="w-5 h-5 text-amber-500" />;
+    if (name.toLowerCase().includes("free"))
+      return <Star className="w-5 h-5 text-slate-400" />;
+    if (name.toLowerCase().includes("premium"))
+      return <Zap className="w-5 h-5 text-amber-500" />;
     return <Crown className="w-5 h-5 text-indigo-500" />;
   };
 
@@ -47,31 +103,40 @@ export const SubscriptionView: React.FC = () => {
     if (!billing?.earlyAccessExpiresAt) return null;
     const expiry = new Date(billing.earlyAccessExpiresAt);
     const now = new Date();
-    if (expiry < now) return 'Early access expired';
-    
-    const daysRemaining = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (expiry < now) return "Early access expired";
+
+    const daysRemaining = Math.ceil(
+      (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
     return `Early access: ${daysRemaining} days remaining (expires ${expiry.toLocaleDateString()})`;
   };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-      
       {paymentStatus && (
-        <div className={`p-4 rounded-xl border ${
-          paymentStatus === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 
-          paymentStatus === 'cancelled' ? 'bg-amber-50 border-amber-200 text-amber-800' :
-          'bg-rose-50 border-rose-200 text-rose-800'
-        }`}>
+        <div
+          className={`p-4 rounded-xl border ${
+            paymentStatus === "success"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : paymentStatus === "cancelled"
+                ? "bg-amber-50 border-amber-200 text-amber-800"
+                : "bg-rose-50 border-rose-200 text-rose-800"
+          }`}
+        >
           <div className="flex items-center gap-2 font-bold">
-            {paymentStatus === 'success' && <Check className="w-5 h-5" />}
-            {paymentStatus === 'success' && 'Payment Successful!'}
-            {paymentStatus === 'cancelled' && 'Payment Cancelled'}
-            {(paymentStatus === 'failed' || paymentStatus === 'error') && 'Payment Failed or Encounetered an Error'}
+            {paymentStatus === "success" && <Check className="w-5 h-5" />}
+            {paymentStatus === "success" && "Payment Successful!"}
+            {paymentStatus === "cancelled" && "Payment Cancelled"}
+            {(paymentStatus === "failed" || paymentStatus === "error") &&
+              "Payment Failed or Encounetered an Error"}
           </div>
           <p className="text-sm mt-1">
-            {paymentStatus === 'success' && 'Your subscription has been updated. You now have access to all premium features.'}
-            {paymentStatus === 'cancelled' && 'You cancelled the checkout process. Your plan remains unchanged.'}
-            {(paymentStatus === 'failed' || paymentStatus === 'error') && 'There was an issue processing your payment. Please try again or contact support.'}
+            {paymentStatus === "success" &&
+              "Your subscription has been updated. You now have access to all premium features."}
+            {paymentStatus === "cancelled" &&
+              "You cancelled the checkout process. Your plan remains unchanged."}
+            {(paymentStatus === "failed" || paymentStatus === "error") &&
+              "There was an issue processing your payment. Please try again or contact support."}
           </p>
         </div>
       )}
@@ -81,13 +146,20 @@ export const SubscriptionView: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              Current Plan: <span className="text-indigo-600">{availablePlans.find(p => p.id === entitlements?.planId)?.name || 'Unknown'}</span>
+              Current Plan:{" "}
+              <span className="text-indigo-600">
+                {availablePlans.find((p) => p.id === entitlements?.planId)
+                  ?.name || "Unknown"}
+              </span>
             </h2>
             <p className="text-sm text-slate-500 mt-1">
               {entitlements?.specialAccess?.length ? (
                 <span className="flex flex-col gap-1">
                   <span className="flex items-center gap-2">
-                    Special Access Granted: <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-semibold rounded uppercase text-[10px] tracking-wider">{entitlements.specialAccess.join(', ')}</span>
+                    Special Access Granted:{" "}
+                    <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-semibold rounded uppercase text-[10px] tracking-wider">
+                      {entitlements.specialAccess.join(", ")}
+                    </span>
                   </span>
                   {billing?.earlyAccessExpiresAt && (
                     <span className="text-emerald-600 font-medium">
@@ -95,22 +167,30 @@ export const SubscriptionView: React.FC = () => {
                     </span>
                   )}
                 </span>
+              ) : billing?.status === "active" ? (
+                `Active subscription. Next billing on ${billing.nextBillingDate}`
               ) : (
-                billing?.status === 'active' 
-                  ? `Active subscription. Next billing on ${billing.nextBillingDate}`
-                  : 'You are currently on the free tier.'
+                "You are currently on the free tier."
               )}
             </p>
           </div>
-          
+
           <div className="flex items-center gap-4 text-sm">
             <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-100">
-              <span className="block text-slate-500 text-xs mb-0.5">Cover Exports</span>
-              <span className="font-bold text-slate-900">{entitlements?.limits.coverExports} / mo</span>
+              <span className="block text-slate-500 text-xs mb-0.5">
+                Cover Exports
+              </span>
+              <span className="font-bold text-slate-900">
+                {entitlements?.limits.coverExports} / mo
+              </span>
             </div>
             <div className="bg-slate-50 px-4 py-2 rounded-lg border border-slate-100">
-              <span className="block text-slate-500 text-xs mb-0.5">AI Credits</span>
-              <span className="font-bold text-slate-900">{entitlements?.limits.aiCredits} / mo</span>
+              <span className="block text-slate-500 text-xs mb-0.5">
+                AI Credits
+              </span>
+              <span className="font-bold text-slate-900">
+                {entitlements?.limits.aiCredits} / mo
+              </span>
             </div>
           </div>
         </div>
@@ -118,26 +198,33 @@ export const SubscriptionView: React.FC = () => {
 
       {/* Pricing Header */}
       <div className="text-center space-y-4 pt-8">
-        <h1 className="text-3xl font-bold text-slate-900">Simple, transparent pricing</h1>
+        <h1 className="text-3xl font-bold text-slate-900">
+          Simple, transparent pricing
+        </h1>
         <p className="text-slate-500 max-w-xl mx-auto">
-          Scale your KDP publishing business with tools designed for serious authors. No hidden fees. Change or cancel anytime.
+          Scale your KDP publishing business with tools designed for serious
+          authors. No hidden fees. Change or cancel anytime.
         </p>
 
         {/* Toggle */}
         <div className="flex items-center justify-center pt-4">
           <div className="bg-slate-100 p-1 rounded-xl inline-flex items-center">
-            <button 
-              onClick={() => setBillingCycle('monthly')}
-              className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            <button
+              onClick={() => setBillingCycle("monthly")}
+              className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
             >
               Monthly
             </button>
-            <button 
-              onClick={() => setBillingCycle('yearly')}
-              className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            <button
+              onClick={() => setBillingCycle("yearly")}
+              className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${billingCycle === "yearly" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
             >
               Yearly
-              <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold ${billingCycle === 'yearly' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>Save 20%</span>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold ${billingCycle === "yearly" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}
+              >
+                Save 20%
+              </span>
             </button>
           </div>
         </div>
@@ -146,58 +233,107 @@ export const SubscriptionView: React.FC = () => {
       {/* Pricing Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
         {availablePlans.map((plan) => (
-          <div key={plan.id} className={`bg-white rounded-2xl border ${entitlements?.planId === plan.id ? 'border-indigo-500 shadow-md ring-1 ring-indigo-500' : 'border-slate-200 shadow-sm'} p-6 flex flex-col`}>
+          <div
+            key={plan.id}
+            className={`bg-white rounded-2xl border ${entitlements?.planId === plan.id ? "border-indigo-500 shadow-md ring-1 ring-indigo-500" : "border-slate-200 shadow-sm"} p-6 flex flex-col`}
+          >
             <div className="mb-4 flex items-center gap-2">
               {getPlanIcon(plan.name)}
               <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
             </div>
-            
+
             <div className="mb-6 flex items-end gap-2">
               <span className="text-4xl font-bold text-slate-900">
-                ${billingCycle === 'yearly' ? (plan.yearlyPriceUSD / 12).toFixed(2) : plan.monthlyPriceUSD}
+                {formatMoney(
+                  getPlanPrice(plan, billingCycle),
+                  plan.currency as "NGN" | "USD" | "GBP",
+                  getLocaleForRegion(user?.country || "NG"),
+                )}
               </span>
-              <span className="text-sm text-slate-500 font-medium mb-1">/ mo</span>
+              <span className="text-sm text-slate-500 font-medium mb-1">
+                / {billingCycle === "yearly" ? "yr" : "mo"}
+              </span>
             </div>
-            {billingCycle === 'yearly' && plan.yearlyPriceUSD > 0 && (
-              <p className="text-sm text-emerald-600 font-medium mb-6 mt-[-16px]">Billed ${plan.yearlyPriceUSD} yearly</p>
+            {billingCycle === "yearly" && (plan.prices.yearly ?? 0) > 0 && (
+              <p className="text-sm text-emerald-600 font-medium mb-6 -mt-4">
+                Billed{" "}
+                {formatMoney(
+                  plan.prices.yearly ?? 0,
+                  plan.currency as "NGN" | "USD" | "GBP",
+                  getLocaleForRegion(user?.country || "NG"),
+                )}{" "}
+                yearly
+              </p>
             )}
 
-            <button 
+            <button
               onClick={() => handleUpgrade(plan.id)}
               disabled={isProcessing || entitlements?.planId === plan.id}
               className={`w-full py-3 px-4 rounded-xl font-semibold transition flex items-center justify-center gap-2 ${
                 entitlements?.planId === plan.id
-                  ? 'bg-indigo-50 text-indigo-700 cursor-default'
-                  : 'bg-slate-900 text-white hover:bg-slate-800'
+                  ? "bg-indigo-50 text-indigo-700 cursor-default"
+                  : "bg-slate-900 text-white hover:bg-slate-800"
               }`}
             >
               {isProcessing && entitlements?.planId !== plan.id ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : entitlements?.planId === plan.id ? (
-                'Current Plan'
+                "Current Plan"
               ) : (
-                'Select Plan'
+                "Select Plan"
               )}
             </button>
 
             <div className="mt-8 space-y-4 flex-1">
-              <h4 className="text-sm font-bold text-slate-900 tracking-wide uppercase">Plan Features</h4>
+              <h4 className="text-sm font-bold text-slate-900 tracking-wide uppercase">
+                Plan Features
+              </h4>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-indigo-500 shrink-0" />
-                  <span className="text-sm text-slate-600"><strong>{plan.limits.keywordSearches}</strong> keyword searches / mo</span>
+                  <span className="text-sm text-slate-600">
+                    <strong>{plan.usageLimits.keywordSearches ?? 0}</strong>{" "}
+                    keyword searches / mo
+                  </span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-indigo-500 shrink-0" />
-                  <span className="text-sm text-slate-600"><strong>{plan.limits.nicheQueries}</strong> niche queries / mo</span>
+                  <span className="text-sm text-slate-600">
+                    <strong>{plan.usageLimits.nicheQueries ?? 0}</strong> niche
+                    queries / mo
+                  </span>
                 </li>
-                <li className={`flex items-start gap-3 ${!plan.features.canExportCover && 'opacity-50'}`}>
-                  <Check className={`w-5 h-5 shrink-0 ${plan.features.canExportCover ? 'text-indigo-500' : 'text-slate-300'}`} />
-                  <span className="text-sm text-slate-600">{plan.features.canExportCover ? <strong>{plan.limits.coverExports} Cover exports</strong> : 'No cover exports'}</span>
+                <li
+                  className={`flex items-start gap-3 ${!plan.features.canExportCover && "opacity-50"}`}
+                >
+                  <Check
+                    className={`w-5 h-5 shrink-0 ${plan.features.canExportCover ? "text-indigo-500" : "text-slate-300"}`}
+                  />
+                  <span className="text-sm text-slate-600">
+                    {plan.features.canExportCover ? (
+                      <strong>
+                        {plan.usageLimits.coverExports ?? 0} Cover exports
+                      </strong>
+                    ) : (
+                      "No cover exports"
+                    )}
+                  </span>
                 </li>
-                <li className={`flex items-start gap-3 ${!plan.features.aiAssistant && 'opacity-50'}`}>
-                  <Check className={`w-5 h-5 shrink-0 ${plan.features.aiAssistant ? 'text-indigo-500' : 'text-slate-300'}`} />
-                  <span className="text-sm text-slate-600">{plan.features.aiAssistant ? <strong>{plan.limits.aiCredits} AI Assistant credits</strong> : 'No AI Assistant'}</span>
+                <li
+                  className={`flex items-start gap-3 ${!plan.features.aiAssistant && "opacity-50"}`}
+                >
+                  <Check
+                    className={`w-5 h-5 shrink-0 ${plan.features.aiAssistant ? "text-indigo-500" : "text-slate-300"}`}
+                  />
+                  <span className="text-sm text-slate-600">
+                    {plan.features.aiAssistant ? (
+                      <strong>
+                        {plan.usageLimits.aiCredits ?? 0} AI Assistant credits
+                      </strong>
+                    ) : (
+                      "No AI Assistant"
+                    )}
+                  </span>
                 </li>
               </ul>
             </div>
@@ -207,17 +343,22 @@ export const SubscriptionView: React.FC = () => {
 
       {/* Admin/Partner Tools (Visible for demo purposes) */}
       <div className="mt-12 bg-slate-50 border border-slate-200 rounded-2xl p-6">
-        <h3 className="text-lg font-bold text-slate-900 mb-2">Developer Tools / System Simulations</h3>
-        <p className="text-sm text-slate-500 mb-6">Simulate backend admin actions such as granting early access or approving lifetime partner accounts.</p>
-        
+        <h3 className="text-lg font-bold text-slate-900 mb-2">
+          Developer Tools / System Simulations
+        </h3>
+        <p className="text-sm text-slate-500 mb-6">
+          Simulate backend admin actions such as granting early access or
+          approving lifetime partner accounts.
+        </p>
+
         <div className="flex flex-wrap gap-4">
-          <button 
+          <button
             onClick={async () => {
               setIsProcessing(true);
               try {
                 await grantEarlyAccess(30);
               } catch (e) {
-                alert('Failed to grant early access');
+                alert("Failed to grant early access");
               } finally {
                 setIsProcessing(false);
               }
@@ -227,14 +368,14 @@ export const SubscriptionView: React.FC = () => {
           >
             Simulate: Grant 30-Day Premium Early Access
           </button>
-          
-          <button 
+
+          <button
             onClick={async () => {
               setIsProcessing(true);
               try {
                 await grantLifetimePartner();
               } catch (e) {
-                alert('Failed to grant lifetime partner access');
+                alert("Failed to grant lifetime partner access");
               } finally {
                 setIsProcessing(false);
               }
@@ -251,10 +392,17 @@ export const SubscriptionView: React.FC = () => {
             <h4 className="text-sm font-bold text-slate-900 mb-4">Audit Log</h4>
             <div className="space-y-3">
               {billing.auditLog.map((log: any, i: number) => (
-                <div key={i} className="flex gap-4 text-sm bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
-                  <span className="text-slate-400 whitespace-nowrap">{new Date(log.date).toLocaleString()}</span>
+                <div
+                  key={i}
+                  className="flex gap-4 text-sm bg-white p-3 rounded-lg border border-slate-100 shadow-sm"
+                >
+                  <span className="text-slate-400 whitespace-nowrap">
+                    {new Date(log.date).toLocaleString()}
+                  </span>
                   <div>
-                    <span className="font-semibold text-slate-700 mr-2">{log.action}</span>
+                    <span className="font-semibold text-slate-700 mr-2">
+                      {log.action}
+                    </span>
                     <span className="text-slate-500">{log.details}</span>
                   </div>
                 </div>
@@ -263,7 +411,6 @@ export const SubscriptionView: React.FC = () => {
           </div>
         )}
       </div>
-
     </div>
   );
 };

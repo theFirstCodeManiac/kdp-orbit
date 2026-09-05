@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { analytics } from "@/src/services/analytics/analytics.ts";
 
 export interface UserSession {
   id: string;
@@ -13,10 +14,10 @@ export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
-  role: 'author' | 'pro_publisher' | 'agency' | 'admin';
+  role: "author" | "pro_publisher" | "agency" | "admin";
   country: string;
-  preferredCurrency: 'NGN' | 'USD' | 'GBP';
-  planId: 'free_starter' | 'author_pro' | 'publisher_elite';
+  preferredCurrency: "NGN" | "USD" | "GBP";
+  planId: "free_starter" | "author_pro" | "publisher_elite";
   isEmailVerified: boolean;
   createdAt: string;
   lastLoginAt: string;
@@ -27,59 +28,76 @@ interface AuthContextType {
   token: string | null;
   sessions: UserSession[];
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   register: (
     email: string,
     password: string,
     displayName: string,
     country: string,
-    preferredCurrency: 'NGN' | 'USD'
-  ) => Promise<{ success: boolean; error?: string; verificationToken?: string }>;
+    preferredCurrency: "NGN" | "USD",
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    verificationToken?: string;
+  }>;
   logout: () => Promise<void>;
-  updateProfile: (data: { displayName?: string; country?: string; preferredCurrency?: 'NGN' | 'USD' }) => Promise<{ success: boolean; error?: string }>;
-  updatePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
-  requestPasswordReset: (email: string) => Promise<{ success: boolean; error?: string; devToken?: string }>;
-  completePasswordReset: (token: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (data: {
+    displayName?: string;
+    country?: string;
+    preferredCurrency?: "NGN" | "USD";
+  }) => Promise<{ success: boolean; error?: string }>;
+  updatePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  requestPasswordReset: (
+    email: string,
+  ) => Promise<{ success: boolean; error?: string; devToken?: string }>;
+  completePasswordReset: (
+    token: string,
+    newPassword: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   verifyEmail: (token: string) => Promise<{ success: boolean; error?: string }>;
-  terminateSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
-  deleteAccount: (password: string) => Promise<{ success: boolean; error?: string }>;
+  terminateSession: (
+    sessionId: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: (
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   testCrossTenantIsolation: (targetUserId: string) => Promise<any>;
   refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('kdp_orbit_token'));
+  const [token, setToken] = useState<string | null>(null);
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refreshUserData = async () => {
-    if (!token) {
-      setUser(null);
-      setSessions([]);
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const res = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch("/api/auth/me", {
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const data = await res.json();
       if (data.success) {
         setUser(data.data.user);
         setSessions(data.data.sessions || []);
       } else {
-        // Token invalid or revoked
-        localStorage.removeItem('kdp_orbit_token');
         setToken(null);
         setUser(null);
         setSessions([]);
       }
     } catch (err) {
-      console.error('Failed to load user session:', err);
+      console.error("Failed to load user session:", err);
     } finally {
       setIsLoading(false);
     }
@@ -87,25 +105,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshUserData();
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    refreshUserData();
   }, [token]);
 
   const login = async (email: string, password: string) => {
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (data.success) {
-        localStorage.setItem('kdp_orbit_token', data.data.token);
         setToken(data.data.token);
         setUser(data.data.user);
         return { success: true };
       }
-      return { success: false, error: data.error?.message || 'Login failed' };
+      return { success: false, error: data.error?.message || "Login failed" };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Network error' };
+      return { success: false, error: err.message || "Network error" };
     }
   };
 
@@ -114,51 +137,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     password: string,
     displayName: string,
     country: string,
-    preferredCurrency: 'NGN' | 'USD'
+    preferredCurrency: "NGN" | "USD",
   ) => {
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, displayName, country, preferredCurrency }),
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          displayName,
+          country,
+          preferredCurrency,
+        }),
       });
       const data = await res.json();
       if (data.success) {
-        localStorage.setItem('kdp_orbit_token', data.data.token);
         setToken(data.data.token);
         setUser(data.data.user);
-        return { success: true, verificationToken: data.data.verificationToken };
+        analytics.identify(data.data.user.id);
+        analytics.track(
+          "account_created",
+          {
+            plan_id: data.data.user.planId,
+            country: data.data.user.country,
+            role: data.data.user.role,
+          },
+          data.data.user.id,
+        );
+        return {
+          success: true,
+          verificationToken: data.data.verificationToken,
+        };
       }
-      return { success: false, error: data.error?.message || 'Registration failed' };
+      return {
+        success: false,
+        error: data.error?.message || "Registration failed",
+      };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Network error' };
+      return { success: false, error: err.message || "Network error" };
     }
   };
 
   const logout = async () => {
-    if (token) {
-      try {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } catch (err) {
-        console.error('Logout error:', err);
-      }
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+    } catch (err) {
+      console.error("Logout error:", err);
     }
-    localStorage.removeItem('kdp_orbit_token');
     setToken(null);
     setUser(null);
     setSessions([]);
   };
 
-  const updateProfile = async (dataPayload: { displayName?: string; country?: string; preferredCurrency?: 'NGN' | 'USD' }) => {
+  const updateProfile = async (dataPayload: {
+    displayName?: string;
+    country?: string;
+    preferredCurrency?: "NGN" | "USD";
+  }) => {
     try {
-      const res = await fetch('/api/auth/profile', {
-        method: 'PUT',
+      const res = await fetch("/api/auth/profile", {
+        method: "PUT",
+        credentials: "include",
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(dataPayload),
       });
@@ -167,19 +215,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(data.data.user);
         return { success: true };
       }
-      return { success: false, error: data.error?.message || 'Profile update failed' };
+      return {
+        success: false,
+        error: data.error?.message || "Profile update failed",
+      };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   };
 
-  const updatePassword = async (currentPassword: string, newPassword: string) => {
+  const updatePassword = async (
+    currentPassword: string,
+    newPassword: string,
+  ) => {
     try {
-      const res = await fetch('/api/auth/password', {
-        method: 'PUT',
+      const res = await fetch("/api/auth/password", {
+        method: "PUT",
+        credentials: "include",
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
@@ -187,7 +242,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.success) {
         return { success: true };
       }
-      return { success: false, error: data.error?.message || 'Password update failed' };
+      return {
+        success: false,
+        error: data.error?.message || "Password update failed",
+      };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -195,23 +253,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const requestPasswordReset = async (email: string) => {
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      return { success: data.success, error: data.error?.message, devToken: data.devToken };
+      return {
+        success: data.success,
+        error: data.error?.message,
+        devToken: data.devToken,
+      };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   };
 
-  const completePasswordReset = async (resetToken: string, newPassword: string) => {
+  const completePasswordReset = async (
+    resetToken: string,
+    newPassword: string,
+  ) => {
     try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: resetToken, newPassword }),
       });
       const data = await res.json();
@@ -223,9 +290,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const verifyEmail = async (verificationToken: string) => {
     try {
-      const res = await fetch('/api/auth/verify-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: verificationToken }),
       });
       const data = await res.json();
@@ -242,8 +310,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const terminateSession = async (sessionId: string) => {
     try {
       const res = await fetch(`/api/auth/sessions/${sessionId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        method: "DELETE",
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const data = await res.json();
       if (data.success) {
@@ -258,11 +327,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteAccount = async (password: string) => {
     try {
-      const res = await fetch('/api/auth/account', {
-        method: 'DELETE',
+      const res = await fetch("/api/auth/account", {
+        method: "DELETE",
+        credentials: "include",
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ password }),
       });
@@ -281,7 +351,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const testCrossTenantIsolation = async (targetUserId: string) => {
     try {
       const res = await fetch(`/api/auth/test-isolation/${targetUserId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const data = await res.json();
       return {
@@ -326,7 +397,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
