@@ -29,31 +29,33 @@ export const TrendingResearchView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchTrends = async () => {
-      if (!token) return;
-      setIsLoading(true);
-      try {
-        const res = await fetch('/api/trends/market-pulse', {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        const json = await res.json();
-        if (json.success) {
-          setData(json.data);
-        } else {
-          setError(json.error?.message || 'Failed to fetch trends');
+  const fetchTrends = React.useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/trends/market-pulse', {
+        headers: {
+          Authorization: `Bearer ${token}`
         }
-      } catch (err: any) {
-        setError('Network error: ' + err.message);
-      } finally {
-        setIsLoading(false);
+      });
+      const json = await res.json();
+      if (json.success) {
+        setData(json.data);
+      } else {
+        setError(json.error?.message || 'We couldn\'t fetch the latest trends right now. Please try again.');
       }
-    };
-    
-    fetchTrends();
+    } catch (err: any) {
+      console.error(err);
+      setError('Something went wrong. Please check your connection and try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    fetchTrends();
+  }, [fetchTrends]);
 
   const ItemList = ({ items, icon, colorClass, emptyMsg }: { items: TrendingItem[], icon: React.ReactNode, colorClass: string, emptyMsg: string }) => {
     if (items.length === 0) {
@@ -113,9 +115,17 @@ export const TrendingResearchView: React.FC = () => {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-rose-600" />
-          {error}
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button 
+            onClick={fetchTrends}
+            className="px-4 py-1.5 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded-lg text-xs font-bold transition whitespace-nowrap"
+          >
+            Retry Request
+          </button>
         </div>
       )}
 

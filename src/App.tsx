@@ -1,19 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { AuthProvider, useAuth } from '@/src/context/AuthContext.tsx';
 import { SubscriptionProvider } from '@/src/context/SubscriptionContext.tsx';
 import { BRAND_CONFIG } from '@/src/config/brand.ts';
 import { AuthModal } from '@/src/components/auth/AuthModal.tsx';
-import { ProfileAndSecurityView } from '@/src/components/account/ProfileAndSecurityView.tsx';
-import { DashboardView } from '@/src/components/dashboard/DashboardView.tsx';
-import { NicheResearchView } from '@/src/components/niche/NicheResearchView.tsx';
-import { BookResearchView } from '@/src/components/books/BookResearchView.tsx';
-import { CompetitionAnalysisView } from '@/src/components/competition/CompetitionAnalysisView.tsx';
-import { TrendingResearchView } from '@/src/components/trends/TrendingResearchView.tsx';
-import { SavedResearchView } from '@/src/components/saved/SavedResearchView.tsx';
-import { CoverDesignerView } from '@/src/components/cover/CoverDesignerView.tsx';
-import { AiAssistantView } from '@/src/components/ai/AiAssistantView.tsx';
-import { SubscriptionView } from '@/src/components/subscription/SubscriptionView.tsx';
-import { AdminDashboardView } from '@/src/components/admin/AdminDashboardView.tsx';
+
+// Lazy loaded views
+const ProfileAndSecurityView = lazy(() => import('@/src/components/account/ProfileAndSecurityView.tsx').then(m => ({ default: m.ProfileAndSecurityView })));
+const DashboardView = lazy(() => import('@/src/components/dashboard/DashboardView.tsx').then(m => ({ default: m.DashboardView })));
+const NicheResearchView = lazy(() => import('@/src/components/niche/NicheResearchView.tsx').then(m => ({ default: m.NicheResearchView })));
+const BookResearchView = lazy(() => import('@/src/components/books/BookResearchView.tsx').then(m => ({ default: m.BookResearchView })));
+const CompetitionAnalysisView = lazy(() => import('@/src/components/competition/CompetitionAnalysisView.tsx').then(m => ({ default: m.CompetitionAnalysisView })));
+const TrendingResearchView = lazy(() => import('@/src/components/trends/TrendingResearchView.tsx').then(m => ({ default: m.TrendingResearchView })));
+const SavedResearchView = lazy(() => import('@/src/components/saved/SavedResearchView.tsx').then(m => ({ default: m.SavedResearchView })));
+const CoverDesignerView = lazy(() => import('@/src/components/cover/CoverDesignerView.tsx').then(m => ({ default: m.CoverDesignerView })));
+const AiAssistantView = lazy(() => import('@/src/components/ai/AiAssistantView.tsx').then(m => ({ default: m.AiAssistantView })));
+const SubscriptionView = lazy(() => import('@/src/components/subscription/SubscriptionView.tsx').then(m => ({ default: m.SubscriptionView })));
+const AdminDashboardView = lazy(() => import('@/src/components/admin/AdminDashboardView.tsx').then(m => ({ default: m.AdminDashboardView })));
+
+// Loading fallback
+const PageLoader = () => (
+  <div className="flex h-full min-h-[400px] w-full items-center justify-center">
+    <div className="flex flex-col items-center gap-4">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+      <div className="text-sm font-medium text-slate-500">Loading view...</div>
+    </div>
+  </div>
+);
+
 import {
   BookOpen,
   LayoutDashboard,
@@ -279,29 +292,34 @@ function MainApp() {
 
       {/* Main Content Area */}
       <main className={`flex-1 w-full mx-auto ${activeTab === 'cover' ? '' : 'max-w-7xl px-4 sm:px-6 lg:px-8 py-8'}`}>
-        {activeTab === 'account' ? (
-          <ProfileAndSecurityView />
-        ) : activeTab === 'niche' ? (
-          <NicheResearchView />
-        ) : activeTab === 'book' ? (
-          <BookResearchView />
-        ) : activeTab === 'competition' ? (
-          <CompetitionAnalysisView />
-        ) : activeTab === 'trends' ? (
-          <TrendingResearchView />
-        ) : activeTab === 'saved' ? (
-          <SavedResearchView />
-        ) : activeTab === 'cover' ? (
-          <CoverDesignerView />
-        ) : activeTab === 'ai' ? (
-          <AiAssistantView />
-        ) : activeTab === 'billing' ? (
-          <SubscriptionView />
-        ) : activeTab === 'admin' ? (
-          <AdminDashboardView />
-        ) : (
-          <DashboardView onNavigateToNiche={() => setActiveTab('niche')} onNavigateToBook={() => setActiveTab('book')} />
-        )}
+        <Suspense fallback={<PageLoader />}>
+          {activeTab === 'account' ? (
+            <ProfileAndSecurityView />
+          ) : activeTab === 'niche' ? (
+            <NicheResearchView />
+          ) : activeTab === 'book' ? (
+            <BookResearchView />
+          ) : activeTab === 'competition' ? (
+            <CompetitionAnalysisView />
+          ) : activeTab === 'trends' ? (
+            <TrendingResearchView />
+          ) : activeTab === 'saved' ? (
+            <SavedResearchView 
+              onNavigateToNiche={() => setActiveTab('niche')} 
+              onNavigateToBook={() => setActiveTab('book')} 
+            />
+          ) : activeTab === 'cover' ? (
+            <CoverDesignerView />
+          ) : activeTab === 'ai' ? (
+            <AiAssistantView />
+          ) : activeTab === 'billing' ? (
+            <SubscriptionView />
+          ) : activeTab === 'admin' ? (
+            <AdminDashboardView />
+          ) : (
+            <DashboardView onNavigateToNiche={() => setActiveTab('niche')} onNavigateToBook={() => setActiveTab('book')} />
+          )}
+        </Suspense>
       </main>
 
       {/* Auth Modal */}

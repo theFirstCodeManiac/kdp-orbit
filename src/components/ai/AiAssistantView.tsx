@@ -70,7 +70,7 @@ export const AiAssistantView: React.FC = () => {
         if (!response.ok) {
           throw new Error(response.status === 503 
             ? 'The AI model is currently experiencing high demand. Please try again in a few moments.' 
-            : `Server returned an unexpected response (${response.status}).`);
+            : `We couldn't connect to the AI right now. Please try again.`);
         }
         data = { content: text }; // Fallback if somehow it's a 200 OK with text
       }

@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/src/context/AuthContext.tsx';
+import { useDebounce } from '@/src/hooks/useDebounce.ts';
 import { 
   Search, BookOpen, Star, TrendingUp, TrendingDown, Minus, 
   Info, Bookmark, BookmarkCheck, AlertCircle, ShoppingCart, Calendar
@@ -23,14 +24,16 @@ interface BookOpportunity {
 export const BookResearchView: React.FC = () => {
   const { token } = useAuth();
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 500);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [results, setResults] = useState<BookOpportunity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAsins, setSavedAsins] = useState<Set<string>>(new Set());
   
-  const performSearch = useCallback(async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const performSearch = useCallback(async (searchQuery: string, pageNum: number = 1) => {
     if (!token) return;
     
     setIsLoading(true);
@@ -44,20 +47,30 @@ export const BookResearchView: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ query })
+        body: JSON.stringify({ query: searchQuery, page: pageNum, limit: 10 })
       });
       const json = await res.json();
       if (json.success) {
         setResults(json.data);
+        if (json.pagination) {
+          setTotalPages(json.pagination.totalPages);
+        }
       } else {
-        setError(json.error?.message || 'Failed to search books.');
+        setError(json.error?.message || 'We couldn\'t complete your search right now. Please try again.');
       }
     } catch (err: any) {
-      setError('Network error: ' + err.message);
+      console.error(err);
+      setError('Something went wrong. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [query, token]);
+  }, [token]);
+
+  useEffect(() => {
+    if (debouncedQuery.trim() !== '') {
+      performSearch(debouncedQuery, page);
+    }
+  }, [debouncedQuery, page, performSearch]);
 
   const toggleSaveBook = (asin: string) => {
     setSavedAsins(prev => {
@@ -69,6 +82,12 @@ export const BookResearchView: React.FC = () => {
       }
       return next;
     });
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    performSearch(query, 1);
   };
 
   return (
@@ -87,7 +106,7 @@ export const BookResearchView: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 max-w-3xl">
-        <form onSubmit={performSearch} className="flex items-center gap-2">
+        <form onSubmit={handleManualSubmit} className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
             <input 
@@ -119,9 +138,17 @@ export const BookResearchView: React.FC = () => {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-rose-600" />
-          {error}
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button 
+            onClick={() => performSearch(debouncedQuery, page)}
+            className="px-4 py-1.5 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded-lg text-xs font-bold transition whitespace-nowrap"
+          >
+            Retry Request
+          </button>
         </div>
       )}
 
@@ -129,7 +156,16 @@ export const BookResearchView: React.FC = () => {
         <div className="text-center bg-white border border-slate-200 rounded-xl p-12 shadow-sm">
           <Search className="h-10 w-10 text-slate-300 mx-auto mb-3" />
           <h3 className="font-bold text-slate-700 text-lg">No books found</h3>
-          <p className="text-sm text-slate-500 mt-1">Try a different ASIN, author, or keyword.</p>
+          <p className="text-sm text-slate-500 mt-1 mb-6">Try a different ASIN, author, or keyword to uncover opportunities.</p>
+          <button 
+            onClick={() => {
+              setQuery('');
+              setHasSearched(false);
+            }} 
+            className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition text-sm"
+          >
+            Clear Search
+          </button>
         </div>
       )}
 
@@ -231,6 +267,28 @@ export const BookResearchView: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {!isLoading && results.length > 0 && totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-8">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          <span className="text-sm font-medium text-slate-700">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

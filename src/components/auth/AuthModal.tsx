@@ -64,7 +64,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
     if (res.success) {
       onClose();
     } else {
-      setError(res.error || 'Demo login failed');
+      console.error(res.error);
+      setError('We couldn\'t log you in right now. Please try again.');
     }
   };
 
@@ -77,7 +78,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
     if (res.success) {
       onClose();
     } else {
-      setError(res.error || 'Sign in failed');
+      console.error(res.error);
+      setError('We couldn\'t sign you in. Please check your credentials and try again.');
     }
   };
 
@@ -96,7 +98,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
         onClose();
       }
     } else {
-      setError(res.error || 'Registration failed');
+      console.error(res.error);
+      setError('We couldn\'t create your account right now. Please try again.');
     }
   };
 
@@ -114,7 +117,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
       }
       setMode('reset');
     } else {
-      setError(res.error || 'Failed to request password reset');
+      console.error(res.error);
+      setError('Something went wrong requesting a password reset. Please try again.');
     }
   };
 
@@ -131,7 +135,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
         setSuccessMessage(null);
       }, 1500);
     } else {
-      setError(res.error || 'Password reset failed');
+      console.error(res.error);
+      setError('We couldn\'t reset your password. The link may have expired.');
     }
   };
 
@@ -147,7 +152,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMo
         onClose();
       }, 1200);
     } else {
-      setError(res.error || 'Verification failed');
+      console.error(res.error);
+      setError('We couldn\'t verify your email. The token may be invalid or expired.');
     }
   };
 

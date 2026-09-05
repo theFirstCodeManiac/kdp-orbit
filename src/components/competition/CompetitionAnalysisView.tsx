@@ -55,10 +55,11 @@ export const CompetitionAnalysisView: React.FC = () => {
       if (json.success) {
         setData(json.data);
       } else {
-        setError(json.error?.message || 'Failed to analyze competition.');
+        setError(json.error?.message || 'We couldn\'t analyze the competition right now. Please try again.');
       }
     } catch (err: any) {
-      setError('Network error: ' + err.message);
+      console.error(err);
+      setError('Something went wrong. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -111,9 +112,17 @@ export const CompetitionAnalysisView: React.FC = () => {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-rose-600" />
-          {error}
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button 
+            onClick={() => performAnalysis()}
+            className="px-4 py-1.5 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded-lg text-xs font-bold transition whitespace-nowrap"
+          >
+            Retry Request
+          </button>
         </div>
       )}
 

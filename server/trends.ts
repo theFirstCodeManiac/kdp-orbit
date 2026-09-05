@@ -28,6 +28,9 @@ trendsRouter.get('/market-pulse', requireAuth, (req, res) => {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
+  // Set cache headers to avoid unnecessary downloads within the same hour
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+
   const data: TrendsData = {
     lastUpdated: today.toISOString(),
     updateFrequencyText: 'Data updated daily',

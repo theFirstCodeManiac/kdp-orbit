@@ -120,6 +120,9 @@ function getDefaultQuota(planId: string, userId: string): DBUsageQuota {
  */
 dashboardRouter.get('/overview', requireAuth, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    // Set a short cache for dashboard to avoid spamming on rapid tab switches
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    
     const user = req.user!;
     const userId = user.id;
 

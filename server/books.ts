@@ -29,7 +29,7 @@ const mockBooks: BookData[] = [
 ];
 
 booksRouter.post('/search', requireAuth, (req, res) => {
-  const { query } = req.body;
+  const { query, page = 1, limit = 10 } = req.body;
   let results = [...mockBooks];
   
   if (query && query.trim() !== '') {
@@ -42,5 +42,19 @@ booksRouter.post('/search', requireAuth, (req, res) => {
     );
   }
   
-  res.json({ success: true, data: results });
+  const total = results.length;
+  const startIndex = (Number(page) - 1) * Number(limit);
+  const endIndex = startIndex + Number(limit);
+  const paginatedResults = results.slice(startIndex, endIndex);
+
+  res.json({ 
+    success: true, 
+    data: paginatedResults,
+    pagination: {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit))
+    }
+  });
 });

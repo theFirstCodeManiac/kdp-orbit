@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import { rateLimit } from 'express-rate-limit';
 import { createServer as createViteServer } from 'vite';
 import { authRouter, ensureDemoUsers } from './server/auth.ts';
@@ -15,10 +16,17 @@ import { aiRouter } from './server/ai.ts';
 import { subscriptionsRouter } from './server/subscriptions.ts';
 import { paymentsRouter } from './server/payments.ts';
 import { adminRouter } from './server/admin.ts';
+import { filesRouter } from './server/files.ts';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Trust the reverse proxy (required for rate limiting behind a proxy like Nginx or Cloud Run)
+  app.set('trust proxy', 1);
+
+  // Compress all responses
+  app.use(compression());
 
   // 1. Security Headers (Helmet)
   // We disable CSP/COEP during development so Vite's HMR and inline styles continue working.
@@ -73,6 +81,7 @@ async function startServer() {
   app.use('/api/subscriptions', subscriptionsRouter);
   app.use('/api/payments', paymentsRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/files', filesRouter);
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
@@ -92,14 +101,15 @@ async function startServer() {
   // Global Error Handler (Exception Handling & Error Monitoring)
   // Ensures stack traces are NEVER leaked to the client in production.
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-    console.error(`[ERROR] ${req.method} ${req.originalUrl}:`, err.message);
+    // Log technical details and stack traces privately for developers
+    console.error(`[ERROR] ${req.method} ${req.originalUrl}:`, err);
     
-    // Do not leak internal details to client
+    // Never expose stack traces or secrets to users
     res.status(err.status || 500).json({
       success: false,
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred.' : err.message
+        message: 'Something went wrong. We couldn\'t complete your request right now. Please try again or contact support if the issue persists.'
       }
     });
   });

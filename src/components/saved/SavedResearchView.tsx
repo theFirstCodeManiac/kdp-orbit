@@ -21,7 +21,12 @@ interface SavedItem {
   addedAt: string;
 }
 
-export const SavedResearchView: React.FC = () => {
+interface SavedResearchViewProps {
+  onNavigateToNiche: () => void;
+  onNavigateToBook: () => void;
+}
+
+export const SavedResearchView: React.FC<SavedResearchViewProps> = ({ onNavigateToNiche, onNavigateToBook }) => {
   const { token } = useAuth();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [items, setItems] = useState<SavedItem[]>([]);
@@ -55,7 +60,8 @@ export const SavedResearchView: React.FC = () => {
       const json = await res.json();
       if (json.success) setItems(json.data);
     } catch (err: any) {
-      setError('Failed to load saved items.');
+      console.error(err);
+      setError('We couldn\'t load your saved items right now. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -251,10 +257,26 @@ export const SavedResearchView: React.FC = () => {
           ) : filteredItems.length === 0 ? (
             <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
               <Folder className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-700">No items found</h3>
-              <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-                {searchQuery ? "No items match your search." : "This folder is currently empty. Start researching to save items here."}
+              <h3 className="text-lg font-bold text-slate-700">You haven't saved any items yet</h3>
+              <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto mb-6">
+                {searchQuery ? "No items match your search." : "Research a keyword or niche and save useful opportunities here."}
               </p>
+              {!searchQuery && (
+                <div className="flex items-center justify-center gap-3">
+                  <button 
+                    onClick={onNavigateToNiche}
+                    className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition text-sm"
+                  >
+                    Research Niches
+                  </button>
+                  <button 
+                    onClick={onNavigateToBook}
+                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition text-sm"
+                  >
+                    Research Books
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

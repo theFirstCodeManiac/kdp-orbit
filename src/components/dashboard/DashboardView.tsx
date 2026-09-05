@@ -123,10 +123,11 @@ export const DashboardView: React.FC<{ onNavigateToNiche?: () => void; onNavigat
       if (json.success) {
         setData(json.data);
       } else {
-        setError(json.error?.message || 'Failed to load dashboard.');
+        setError(json.error?.message || 'We couldn\'t load your dashboard right now. Please try again.');
       }
     } catch (err: any) {
-      setError(err.message || 'Network error loading dashboard.');
+      console.error(err);
+      setError('Something went wrong. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }

@@ -45,11 +45,13 @@ export const NicheResearchView: React.FC = () => {
   });
 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [results, setResults] = useState<NicheOpportunity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const performSearch = useCallback(async () => {
+  const performSearch = useCallback(async (pageNum: number = 1) => {
     if (!token) return;
     setIsLoading(true);
     setError(null);
@@ -68,16 +70,20 @@ export const NicheResearchView: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ filters: safeFilters })
+        body: JSON.stringify({ filters: safeFilters, page: pageNum, limit: 10 })
       });
       const json = await res.json();
       if (json.success) {
         setResults(json.data);
+        if (json.pagination) {
+          setTotalPages(json.pagination.totalPages);
+        }
       } else {
-        setError(json.error?.message || 'Failed to fetch niches.');
+        setError(json.error?.message || 'We couldn\'t complete your search right now. Please try again.');
       }
     } catch (err: any) {
-      setError('Network error: ' + err.message);
+      console.error(err);
+      setError('Something went wrong. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -85,8 +91,8 @@ export const NicheResearchView: React.FC = () => {
 
   // Initial load
   useEffect(() => {
-    performSearch();
-  }, [performSearch]);
+    performSearch(page);
+  }, [performSearch, page]);
 
   const calculateScore = (n: NicheOpportunity) => {
     const totalWeight = weights.demand + weights.competition + weights.trend + weights.bestseller;
@@ -292,7 +298,7 @@ export const NicheResearchView: React.FC = () => {
             </div>
             
             <button 
-              onClick={performSearch}
+              onClick={() => { setPage(1); performSearch(1); }}
               className="w-full bg-blue-600 text-white font-semibold rounded-lg py-2.5 text-sm hover:bg-blue-700 transition flex items-center justify-center gap-2 mt-2"
             >
               <Search className="h-4 w-4" />
@@ -304,9 +310,17 @@ export const NicheResearchView: React.FC = () => {
         {/* Results Grid */}
         <div className="lg:col-span-9">
           {error && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 mb-4 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-rose-600" />
-              {error}
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-900 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>{error}</span>
+              </div>
+              <button 
+                onClick={() => performSearch(page)}
+                className="px-4 py-1.5 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded-lg text-xs font-bold transition whitespace-nowrap"
+              >
+                Retry Request
+              </button>
             </div>
           )}
 
@@ -320,7 +334,23 @@ export const NicheResearchView: React.FC = () => {
             <div className="text-center bg-white border border-slate-200 rounded-xl p-12 shadow-sm">
               <Search className="h-10 w-10 text-slate-300 mx-auto mb-3" />
               <h3 className="font-bold text-slate-700 text-lg">No Niches Found</h3>
-              <p className="text-sm text-slate-500 mt-1">Try loosening your filters to discover more opportunities.</p>
+              <p className="text-sm text-slate-500 mt-1 mb-6">Try loosening your filters to discover more opportunities.</p>
+              <button 
+                onClick={() => {
+                  setFilters({
+                    demand: 'All',
+                    competition: 'All',
+                    trend: 'All',
+                    category: 'All',
+                    minPrice: ''
+                  });
+                  setPage(1);
+                  performSearch(1);
+                }} 
+                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition text-sm"
+              >
+                Reset Filters
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -431,6 +461,28 @@ export const NicheResearchView: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {!isLoading && results.length > 0 && totalPages > 1 && (
+            <div className="flex justify-center items-center gap-4 mt-8 mb-4">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-sm font-medium text-slate-700">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
             </div>
           )}
         </div>
