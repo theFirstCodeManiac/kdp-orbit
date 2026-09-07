@@ -26,6 +26,7 @@ logs/
 *.p12
 serviceAccount*.json
 firebase-adminsdk-*.json
+firebase-applet-config.json
 
 # Operating system and editor files
 .DS_Store
