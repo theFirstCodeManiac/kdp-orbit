@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
 import helmet from "helmet";

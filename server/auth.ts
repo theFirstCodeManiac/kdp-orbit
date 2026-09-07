@@ -11,9 +11,24 @@ let transporter: nodemailer.Transporter | null = null;
 
 async function setupMailer() {
   if (process.env.SMTP_URL) {
-    // If user provided a real SMTP URL (e.g. smtps://user:pass@smtp.gmail.com)
     transporter = nodemailer.createTransport(process.env.SMTP_URL);
+  } else if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: Number(process.env.SMTP_PORT || 465),
+      secure: process.env.SMTP_SECURE !== "false",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
   } else {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "SMTP_USER and SMTP_PASS (or SMTP_URL) are required in production.",
+      );
+    }
+
     // Automatically use Ethereal for testing "real" email flow locally
     const testAccount = await nodemailer.createTestAccount();
     transporter = nodemailer.createTransport({
@@ -36,7 +51,7 @@ async function sendVerificationEmail(email: string, code: string) {
   if (!transporter) return;
 
   const mailOptions = {
-    from: '"Idah Daniel - Founder/CEO - KDP Orbit" <danielidah608@gmail.com>',
+    from: `"Idah Daniel - Founder/CEO - KDP Orbit" <${process.env.SMTP_USER || "danielidah608@gmail.com"}>`,
     to: email,
     subject: "Verify your KDP Orbit Account",
     text: `Your verification code is: ${code}`,
