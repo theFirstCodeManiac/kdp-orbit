@@ -1,9 +1,41 @@
+# Dependencies and package-manager caches
 node_modules/
+.pnpm-store/
+.npm/
+
+# Build, bundler, and test output
 build/
 dist/
 coverage/
-.DS_Store
+.vite/
+.cache/
+.nyc_output/
+*.tsbuildinfo
+
+# Runtime data and logs
+.storage/
+logs/
 *.log
+*.pid
+
+# Environment files and local credentials
 .env*
 !.env.example
-.storage/
+*.pem
+*.key
+*.p12
+serviceAccount*.json
+firebase-adminsdk-*.json
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
