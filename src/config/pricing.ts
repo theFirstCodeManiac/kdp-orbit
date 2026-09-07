@@ -15,9 +15,13 @@ export interface PricingPlan {
   isActive: boolean;
 }
 
-export const PRICING_CONFIG = {
-  defaultCurrency: "NGN" as CurrencyCode,
-  defaultBillingInterval: "monthly" as BillingInterval,
+export const PRICING_CONFIG: {
+  defaultCurrency: CurrencyCode;
+  defaultBillingInterval: BillingInterval;
+  plans: PricingPlan[];
+} = {
+  defaultCurrency: "NGN",
+  defaultBillingInterval: "monthly",
   plans: [
     {
       id: "free_starter",
@@ -99,7 +103,7 @@ export const PRICING_CONFIG = {
       isActive: true,
     },
   ],
-} as const;
+};
 
 export const getPricingPlan = (planId: string) =>
   PRICING_CONFIG.plans.find((plan) => plan.id === planId) ??

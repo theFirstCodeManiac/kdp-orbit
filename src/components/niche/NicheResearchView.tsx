@@ -17,6 +17,8 @@ import {
   AlertCircle,
   RefreshCw,
   Info,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
 import {
   formatMoney,
@@ -71,6 +73,99 @@ export const NicheResearchView: React.FC = () => {
   const [results, setResults] = useState<NicheOpportunity[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [savedNichesMap, setSavedNichesMap] = useState<Map<string, string>>(new Map());
+
+  // Load saved niches from backend
+  useEffect(() => {
+    if (!token) return;
+    const fetchSaved = async () => {
+      try {
+        const res = await fetch("/api/saved/items?collectionId=all", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const map = new Map<string, string>();
+          for (const item of json.data) {
+            if (item.type === 'niche' && item.meta?.nicheId) {
+              map.set(item.meta.nicheId, item.id);
+            }
+          }
+          setSavedNichesMap(map);
+        }
+      } catch (err) {
+        console.error("Failed to fetch saved niches:", err);
+      }
+    };
+    fetchSaved();
+  }, [token]);
+
+  const toggleSaveNiche = async (niche: NicheOpportunity) => {
+    if (!token) return;
+    const isCurrentlySaved = savedNichesMap.has(niche.id);
+
+    if (isCurrentlySaved) {
+      const savedId = savedNichesMap.get(niche.id);
+      setSavedNichesMap((prev) => {
+        const next = new Map(prev);
+        next.delete(niche.id);
+        return next;
+      });
+
+      if (savedId) {
+        try {
+          await fetch(`/api/saved/items/${savedId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } catch (err) {
+          console.error("Failed to delete saved niche:", err);
+        }
+      }
+    } else {
+      try {
+        const res = await fetch("/api/saved/items", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            type: "niche",
+            title: niche.title,
+            subtitle: `${niche.category} • ${niche.otherIndicators.monthlySearches.toLocaleString()} searches/mo`,
+            meta: {
+              nicheId: niche.id,
+              category: niche.category,
+              demandScore: niche.demandScore,
+              competitionScore: niche.competitionScore,
+              pricingAverageUSD: niche.pricingAverageUSD,
+              reviewAverage: niche.reviewAverage
+            }
+          })
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          setSavedNichesMap((prev) => {
+            const next = new Map(prev);
+            next.set(niche.id, json.data.id);
+            return next;
+          });
+          analytics.track(
+            "keyword_saved",
+            {
+              source: "niche_research",
+              saved_type: "niche",
+            },
+            user?.id,
+          );
+        }
+      } catch (err) {
+        console.error("Failed to save niche:", err);
+      }
+    }
+  };
 
   const performSearch = useCallback(
     async (pageNum: number = 1) => {
@@ -537,9 +632,26 @@ export const NicheResearchView: React.FC = () => {
                               {score}
                             </div>
                           </div>
-                          <button className="sm:mt-4 text-xs font-semibold bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center gap-1.5">
-                            Deep Dive <ArrowUpRight className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex items-center gap-2 sm:mt-4">
+                            <button
+                              onClick={() => toggleSaveNiche(niche)}
+                              className={`p-2 rounded-lg border transition ${
+                                savedNichesMap.has(niche.id)
+                                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                                  : "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                              }`}
+                              title={savedNichesMap.has(niche.id) ? "Remove from saved" : "Save niche"}
+                            >
+                              {savedNichesMap.has(niche.id) ? (
+                                <BookmarkCheck className="h-4 w-4" />
+                              ) : (
+                                <Bookmark className="h-4 w-4" />
+                              )}
+                            </button>
+                            <button className="text-xs font-semibold bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center gap-1.5">
+                              Deep Dive <ArrowUpRight className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
 

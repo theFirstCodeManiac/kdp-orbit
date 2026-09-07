@@ -2,9 +2,61 @@ import express, { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import * as nodemailer from "nodemailer";
 import { db, DBUser, DBSession } from "./db.ts";
 
 export const authRouter = express.Router();
+
+let transporter: nodemailer.Transporter | null = null;
+
+async function setupMailer() {
+  if (process.env.SMTP_URL) {
+    // If user provided a real SMTP URL (e.g. smtps://user:pass@smtp.gmail.com)
+    transporter = nodemailer.createTransport(process.env.SMTP_URL);
+  } else {
+    // Automatically use Ethereal for testing "real" email flow locally
+    const testAccount = await nodemailer.createTestAccount();
+    transporter = nodemailer.createTransport({
+      host: "smtp.ethereal.email",
+      port: 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass,
+      },
+    });
+    console.log("No SMTP_URL provided. Using Ethereal Email for testing.");
+  }
+}
+
+// Fire-and-forget setup
+setupMailer().catch(console.error);
+
+async function sendVerificationEmail(email: string, code: string) {
+  if (!transporter) return;
+
+  const mailOptions = {
+    from: '"Idah Daniel - Founder/CEO - KDP Orbit" <danielidah608@gmail.com>',
+    to: email,
+    subject: "Verify your KDP Orbit Account",
+    text: `Your verification code is: ${code}`,
+    html: `<div style="font-family: sans-serif; max-w-lg">
+      <h2>Welcome to KDP Orbit!</h2>
+      <p>Your 6-digit email verification code is:</p>
+      <h1 style="letter-spacing: 0.25em; background: #f3f4f6; padding: 10px; border-radius: 8px; display: inline-block;">${code}</h1>
+      <p>Enter this code in the app to complete your registration.</p>
+    </div>`,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    if (!process.env.SMTP_URL) {
+      console.log("Verification email sent! Preview URL: %s", nodemailer.getTestMessageUrl(info));
+    }
+  } catch (error) {
+    console.error("Error sending verification email:", error);
+  }
+}
 
 function resolveTokenFromRequest(req: Request): string | undefined {
   const authHeader = req.headers.authorization;
@@ -53,11 +105,11 @@ export interface AuthenticatedRequest extends Request {
 }
 
 // Authentication Middleware
-export function requireAuth(
+export async function requireAuth(
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const token = resolveTokenFromRequest(req);
   if (!token) {
     res.status(401).json({
@@ -75,7 +127,7 @@ export function requireAuth(
       userId: string;
       email: string;
     };
-    const user = db.findUserById(decoded.userId);
+    const user = await db.findUserById(decoded.userId);
 
     if (!user) {
       res.status(401).json({
@@ -90,7 +142,7 @@ export function requireAuth(
 
     // Verify session in active sessions
     let activeSession: DBSession | undefined;
-    for (const session of db.sessions.values()) {
+    for (const session of (await db.getAllSessions())) {
       if (session.token === token && session.userId === user.id) {
         activeSession = session;
         session.lastActiveAt = new Date().toISOString();
@@ -126,11 +178,11 @@ export function requireAuth(
 }
 
 // Admin Authorization Middleware
-export function requireAdmin(
+export async function requireAdmin(
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   // First, verify standard auth
   requireAuth(req, res, () => {
     // Then verify role
@@ -147,286 +199,8 @@ export function requireAdmin(
 
 // Helper: Seed initial demo user for instant testing if empty
 export async function ensureDemoUsers() {
-  if (db.users.size === 0) {
-    const salt = await bcrypt.genSalt(10);
-    const demoPasswordHash = await bcrypt.hash("AuthorPass2026!", salt);
-
-    const user1: DBUser = {
-      id: "usr_demo_nigeria_01",
-      email: "chidi.author@example.com",
-      passwordHash: demoPasswordHash,
-      displayName: "Chidi Okafor",
-      role: "author",
-      country: "NG",
-      preferredCurrency: "NGN",
-      planId: "author_pro",
-      isEmailVerified: true,
-      createdAt: new Date(Date.now() - 30 * 86400000).toISOString(),
-      updatedAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-    };
-
-    const user2: DBUser = {
-      id: "usr_demo_global_02",
-      email: "sarah.publisher@example.com",
-      passwordHash: demoPasswordHash,
-      displayName: "Sarah Jenkins",
-      role: "pro_publisher",
-      country: "US",
-      preferredCurrency: "USD",
-      planId: "publisher_elite",
-      isEmailVerified: true,
-      createdAt: new Date(Date.now() - 15 * 86400000).toISOString(),
-      updatedAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-    };
-
-    db.users.set(user1.id, user1);
-    db.users.set(user2.id, user2);
-
-    // Seed isolated data for User 1
-    db.researchItems.set("res_01", {
-      id: "res_01",
-      userId: user1.id,
-      title: "African Folktales & Coloring Books for Kids",
-      type: "niche",
-      payload: {
-        categoryPath:
-          "Books > Children's Books > Geography & Cultures > Africa",
-        opportunityScore: 88,
-        rating: "Strong",
-        demand: "High",
-        competition: "Low",
-        trend: "Breakout",
-        avgBSR: 14200,
-        estimatedRevenueUSD: 1850,
-        estimatedRevenueNGN: 2682500,
-        dailySalesTop10: 24,
-        avgPriceUSD: 8.99,
-        notes:
-          "High organic search volume on Amazon US & UK, very few high-quality illustrated titles from native African creators.",
-      },
-      createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-    });
-
-    db.researchItems.set("res_01b", {
-      id: "res_01b",
-      userId: user1.id,
-      title: "Daily Prayer & Gratitude Journal for Christian Men",
-      type: "niche",
-      payload: {
-        categoryPath:
-          "Books > Christian Books & Bibles > Christian Living > Spiritual Growth",
-        opportunityScore: 82,
-        rating: "Viable",
-        demand: "Very High",
-        competition: "Moderate",
-        trend: "Growing",
-        avgBSR: 8900,
-        estimatedRevenueUSD: 3100,
-        estimatedRevenueNGN: 4495000,
-        dailySalesTop10: 38,
-        avgPriceUSD: 10.99,
-        notes: "Sub-niche with strong Father's Day and Q4 holiday surge.",
-      },
-      createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-    });
-
-    db.researchItems.set("res_01c", {
-      id: "res_01c",
-      userId: user1.id,
-      title: "Yoruba & Igbo Language Picture Dictionary for Toddlers",
-      type: "niche",
-      payload: {
-        categoryPath:
-          "Books > Children's Books > Early Learning > Basic Concepts",
-        opportunityScore: 92,
-        rating: "Exceptional",
-        demand: "High",
-        competition: "Very Low",
-        trend: "Breakout",
-        avgBSR: 18400,
-        estimatedRevenueUSD: 1450,
-        estimatedRevenueNGN: 2102500,
-        dailySalesTop10: 16,
-        avgPriceUSD: 9.99,
-        notes:
-          "Diaspora Nigerian parents in US, UK, and Canada actively searching with zero dominant competitors.",
-      },
-      createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    });
-
-    // Seed recent searches for User 1
-    db.recentSearches.set("sea_01", {
-      id: "sea_01",
-      userId: user1.id,
-      query: "african folktales kids coloring book",
-      type: "keyword",
-      resultsCount: 384,
-      timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    });
-    db.recentSearches.set("sea_02", {
-      id: "sea_02",
-      userId: user1.id,
-      query: "Christian prayer journal for men 2026",
-      type: "keyword",
-      resultsCount: 1240,
-      timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    });
-    db.recentSearches.set("sea_03", {
-      id: "sea_03",
-      userId: user1.id,
-      query: "Igbo language toddler flashcards paperback",
-      type: "niche",
-      resultsCount: 88,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
-    });
-    db.recentSearches.set("sea_04", {
-      id: "sea_04",
-      userId: user1.id,
-      query: "B08F1V4W9K (Bestseller Competitor Reverse Lookup)",
-      type: "book",
-      resultsCount: 1,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    });
-
-    // Seed cover projects for User 1
-    db.coverProjects.set("cov_01", {
-      id: "cov_01",
-      userId: user1.id,
-      title: "Anansi & Friends: West African Tales Coloring Book",
-      trimSize: "8.5 x 11 in",
-      pageCount: 84,
-      paperType: "white",
-      spineWidthInches: 0.189,
-      createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-    });
-    db.coverProjects.set("cov_02", {
-      id: "cov_02",
-      userId: user1.id,
-      title: "The Guided Men’s War Room Devotional 2026",
-      trimSize: "6 x 9 in",
-      pageCount: 140,
-      paperType: "cream",
-      spineWidthInches: 0.35,
-      createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
-    });
-
-    // Seed usage quota for User 1 (Author Pro: 250 keywords, 100 niches, 150 AI, 25 covers)
-    db.usageRecords.set(user1.id, {
-      userId: user1.id,
-      month: "2026-09",
-      keywordSearchesUsed: 38,
-      keywordSearchesLimit: 250,
-      nicheQueriesUsed: 14,
-      nicheQueriesLimit: 100,
-      aiCreditsUsed: 42,
-      aiCreditsLimit: 150,
-      coverExportsUsed: 3,
-      coverExportsLimit: 25,
-    });
-
-    db.billingRecords.set(user1.id, {
-      userId: user1.id,
-      planId: "author_pro",
-      status: "active",
-      billingCycle: "monthly",
-      trialEndsAt: null,
-      promotionalAccess: false,
-      lifetimeAccess: false,
-      partnerAccount: false,
-      adminGrantedAccess: false,
-      earlyAdopterAccess: false,
-      earlyAccessActivatedAt: null,
-      earlyAccessExpiresAt: null,
-      auditLog: [],
-      currency: "NGN",
-      currentAmount: 12500,
-      paymentMethodLast4: "4190",
-      nextBillingDate: "2026-10-01",
-      invoices: [
-        {
-          id: "inv_101",
-          date: "2026-09-01",
-          amount: 12500,
-          currency: "NGN",
-          status: "paid",
-        },
-      ],
-    });
-
-    // Seed isolated data for User 2
-    db.researchItems.set("res_02", {
-      id: "res_02",
-      userId: user2.id,
-      title: "High-Ticket Sudoku & Logic Grid Puzzles",
-      type: "keyword",
-      payload: { bsr: 6500, estimatedRevenueUSD: 4200 },
-      createdAt: new Date().toISOString(),
-    });
-
-    db.recentSearches.set("sea_05", {
-      id: "sea_05",
-      userId: user2.id,
-      query: "extreme hard sudoku large print for seniors",
-      type: "keyword",
-      resultsCount: 840,
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    });
-
-    db.coverProjects.set("cov_03", {
-      id: "cov_03",
-      userId: user2.id,
-      title: "Zen Logic: 500 Cryptic Grids",
-      trimSize: "8.5 x 11 in",
-      pageCount: 220,
-      paperType: "white",
-      spineWidthInches: 0.495,
-      createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-    });
-
-    db.usageRecords.set(user2.id, {
-      userId: user2.id,
-      month: "2026-09",
-      keywordSearchesUsed: 185,
-      keywordSearchesLimit: 1000,
-      nicheQueriesUsed: 80,
-      nicheQueriesLimit: 500,
-      aiCreditsUsed: 320,
-      aiCreditsLimit: 1000,
-      coverExportsUsed: 14,
-      coverExportsLimit: 100,
-    });
-
-    db.billingRecords.set(user2.id, {
-      userId: user2.id,
-      planId: "publisher_elite",
-      status: "active",
-      billingCycle: "monthly",
-      trialEndsAt: null,
-      promotionalAccess: false,
-      lifetimeAccess: false,
-      partnerAccount: false,
-      adminGrantedAccess: false,
-      earlyAdopterAccess: false,
-      earlyAccessActivatedAt: null,
-      earlyAccessExpiresAt: null,
-      auditLog: [],
-      currency: "USD",
-      currentAmount: 34.99,
-      paymentMethodLast4: "8812",
-      nextBillingDate: "2026-10-01",
-      invoices: [
-        {
-          id: "inv_201",
-          date: "2026-09-01",
-          amount: 34.99,
-          currency: "USD",
-          status: "paid",
-        },
-      ],
-    });
-  }
+  // Demo users have been removed for production readiness.
+  // The database will now be completely empty on initialization.
 }
 
 import { rateLimit } from "express-rate-limit";
@@ -493,7 +267,7 @@ authRouter.post(
         return;
       }
 
-      if (db.findUserByEmail(email)) {
+      if (await db.findUserByEmail(email)) {
         res.status(409).json({
           success: false,
           error: {
@@ -507,7 +281,7 @@ authRouter.post(
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash(password, salt);
       const userId = "usr_" + crypto.randomBytes(8).toString("hex");
-      const verificationToken = crypto.randomBytes(24).toString("hex");
+      const verificationToken = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
 
       const newUser: DBUser = {
         id: userId,
@@ -529,10 +303,10 @@ authRouter.post(
         lastLoginAt: new Date().toISOString(),
       };
 
-      db.users.set(newUser.id, newUser);
+      await db.setUser(newUser);
 
       // Initialize usage quota
-      db.usageRecords.set(userId, {
+      await db.setUsageRecord(userId, {
         userId,
         month: new Date().toISOString().slice(0, 7),
         keywordSearchesUsed: 0,
@@ -566,7 +340,7 @@ authRouter.post(
         lastActiveAt: new Date().toISOString(),
       };
 
-      db.sessions.set(session.id, session);
+      await db.setSession(session);
 
       res.cookie("kdp_orbit_token", token, {
         httpOnly: true,
@@ -575,6 +349,9 @@ authRouter.post(
         path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
+
+      // Send real email verification
+      await sendVerificationEmail(newUser.email, verificationToken);
 
       res.status(201).json({
         success: true,
@@ -625,7 +402,7 @@ authRouter.post(
         return;
       }
 
-      const user = db.findUserByEmail(email);
+      const user = await db.findUserByEmail(email);
       if (!user) {
         res.status(401).json({
           success: false,
@@ -674,7 +451,7 @@ authRouter.post(
         lastActiveAt: new Date().toISOString(),
       };
 
-      db.sessions.set(session.id, session);
+      await db.setSession(session);
 
       res.cookie("kdp_orbit_token", token, {
         httpOnly: true,
@@ -705,9 +482,9 @@ authRouter.post(
 authRouter.post(
   "/logout",
   requireAuth,
-  (req: AuthenticatedRequest, res: Response): void => {
+  async (req: AuthenticatedRequest, res: Response) => {
     if (req.sessionId) {
-      db.sessions.delete(req.sessionId);
+      await db.deleteSession(req.sessionId);
     }
 
     res.clearCookie("kdp_orbit_token", { path: "/" });
@@ -719,9 +496,9 @@ authRouter.post(
 authRouter.get(
   "/me",
   requireAuth,
-  (req: AuthenticatedRequest, res: Response): void => {
+  async (req: AuthenticatedRequest, res: Response) => {
     const user = req.user!;
-    const userSessions = Array.from(db.sessions.values())
+    const userSessions = Array.from((await db.getAllSessions()))
       .filter((s) => s.userId === user.id)
       .map((s) => ({
         id: s.id,
@@ -746,8 +523,8 @@ authRouter.get(
 authRouter.put(
   "/profile",
   requireAuth,
-  (req: AuthenticatedRequest, res: Response): void => {
-    const user = db.findUserById(req.user!.id);
+  async (req: AuthenticatedRequest, res: Response) => {
+    const user = await db.findUserById(req.user!.id);
     if (!user) {
       res.status(404).json({
         success: false,
@@ -775,7 +552,7 @@ authRouter.put(
   "/password",
   requireAuth,
   async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-    const user = db.findUserById(req.user!.id);
+    const user = await db.findUserById(req.user!.id);
     if (!user) {
       res.status(404).json({
         success: false,
@@ -831,8 +608,8 @@ authRouter.put(
 authRouter.delete(
   "/sessions/:sessionId",
   requireAuth,
-  (req: AuthenticatedRequest, res: Response): void => {
-    const session = db.sessions.get(req.params.sessionId);
+  async (req: AuthenticatedRequest, res: Response) => {
+    const session = await db.getSession(req.params.sessionId);
     if (!session) {
       res.status(404).json({
         success: false,
@@ -854,7 +631,7 @@ authRouter.delete(
       return;
     }
 
-    db.sessions.delete(session.id);
+    await db.deleteSession(session.id);
     res.json({ success: true, message: "Session terminated successfully." });
   },
 );
@@ -863,7 +640,7 @@ authRouter.delete(
 authRouter.post(
   "/forgot-password",
   authRateLimiter,
-  (req: Request, res: Response): void => {
+  async (req: Request, res: Response) => {
     const { email } = req.body;
     if (!email || !isValidEmail(email)) {
       res.status(400).json({
@@ -876,7 +653,7 @@ authRouter.post(
       return;
     }
 
-    const user = db.findUserByEmail(email);
+    const user = await db.findUserByEmail(email);
     if (!user) {
       // Return standard generic message to prevent email enumeration attacks
       res.json({
@@ -930,7 +707,7 @@ authRouter.post(
     }
 
     let matchedUser: DBUser | undefined;
-    for (const user of db.users.values()) {
+    for (const user of (await db.getAllUsers())) {
       if (
         user.resetPasswordToken === token &&
         user.resetPasswordExpires &&
@@ -969,7 +746,7 @@ authRouter.post(
 authRouter.post(
   "/verify-email",
   authRateLimiter,
-  (req: Request, res: Response): void => {
+  async (req: Request, res: Response) => {
     const { token } = req.body;
     if (!token) {
       res.status(400).json({
@@ -983,7 +760,7 @@ authRouter.post(
     }
 
     let matchedUser: DBUser | undefined;
-    for (const user of db.users.values()) {
+    for (const user of (await db.getAllUsers())) {
       if (user.emailVerificationToken === token) {
         matchedUser = user;
         break;
@@ -1029,7 +806,7 @@ authRouter.delete(
       return;
     }
 
-    const user = db.findUserById(req.user!.id);
+    const user = await db.findUserById(req.user!.id);
     if (!user) {
       res.status(404).json({
         success: false,
@@ -1050,7 +827,7 @@ authRouter.delete(
       return;
     }
 
-    db.deleteUserCascade(user.id);
+    await db.deleteUserCascade(user.id);
     res.json({
       success: true,
       message:
@@ -1064,7 +841,7 @@ authRouter.delete(
 authRouter.get(
   "/test-isolation/:targetUserId",
   requireAuth,
-  (req: AuthenticatedRequest, res: Response): void => {
+  async (req: AuthenticatedRequest, res: Response) => {
     if (process.env.NODE_ENV === "production") {
       res.status(404).json({
         success: false,
@@ -1092,11 +869,11 @@ authRouter.get(
     }
 
     // If matched or admin, returns the data
-    const targetUser = db.findUserById(targetUserId);
-    const targetResearch = Array.from(db.researchItems.values()).filter(
+    const targetUser = await db.findUserById(targetUserId);
+    const targetResearch = Array.from((await db.getAllResearchItems())).filter(
       (r) => r.userId === targetUserId,
     );
-    const targetBilling = db.billingRecords.get(targetUserId);
+    const targetBilling = await db.getBillingRecord(targetUserId);
 
     res.json({
       success: true,

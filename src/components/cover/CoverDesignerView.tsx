@@ -94,7 +94,7 @@ const TEMPLATES = [
 
 export const CoverDesignerView: React.FC = () => {
   const { canAccess, isLoading: isSubscriptionLoading } = useSubscription();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   // State
   const [config, setConfig] = useState<KdpConfig>({
     format: "paperback",
@@ -117,6 +117,48 @@ export const CoverDesignerView: React.FC = () => {
     "setup",
   );
   const [showExportModal, setShowExportModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+
+  const handleSaveProject = async () => {
+    if (!token) return;
+    setIsSaving(true);
+    setSaveStatus(null);
+    const spineWidth = config.pageCount * (config.paperType === "white" ? 0.002252 : 0.0025);
+    try {
+      const res = await fetch("/api/saved/cover-projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: `${config.trimWidth}x${config.trimHeight} ${config.format === 'paperback' ? 'Paperback' : 'Hardcover'} Cover`,
+          trimSize: `${config.trimWidth}x${config.trimHeight}`,
+          pageCount: config.pageCount,
+          paperType: config.paperType,
+          spineWidthInches: spineWidth,
+          elements,
+          config
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSaveStatus("Saved to Cloud!");
+        setTimeout(() => setSaveStatus(null), 3000);
+        analytics.track("cover_saved", { source: "cover_designer", element_count: elements.length }, user?.id);
+      } else {
+        setSaveStatus("Save failed");
+        setTimeout(() => setSaveStatus(null), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+      setSaveStatus("Error saving");
+      setTimeout(() => setSaveStatus(null), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const stageRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -327,8 +369,13 @@ export const CoverDesignerView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 px-3 py-1.5 rounded hover:bg-slate-100 transition">
-            <Save className="h-4 w-4" /> Save Project
+          <button 
+            onClick={handleSaveProject}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 px-3 py-1.5 rounded hover:bg-slate-100 disabled:opacity-50 transition border border-slate-200"
+          >
+            <Save className="h-4 w-4 text-indigo-600" /> 
+            {isSaving ? "Saving..." : saveStatus ? saveStatus : "Save Project"}
           </button>
           <button
             onClick={handleExport}

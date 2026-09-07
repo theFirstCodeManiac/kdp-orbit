@@ -1,8 +1,9 @@
 import React, { useState, Suspense, lazy, useEffect } from "react";
 import { AuthProvider, useAuth } from "@/src/context/AuthContext.tsx";
 import { SubscriptionProvider } from "@/src/context/SubscriptionContext.tsx";
+import { ThemeProvider, useTheme } from "@/src/context/ThemeContext.tsx";
 import { BRAND_CONFIG } from "@/src/config/brand.ts";
-import { AuthModal } from "@/src/components/auth/AuthModal.tsx";
+import { AuthPage } from "@/src/components/auth/AuthPage.tsx";
 import {
   BookOpen,
   LayoutDashboard,
@@ -222,6 +223,7 @@ const TypewriterHeadline = () => {
 
 function MainApp() {
   const { user, logout, isLoading } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"login" | "register">(
     "login",
@@ -510,12 +512,17 @@ function MainApp() {
 
   const renderAuthenticatedApp = () => {
     const navItems = [
-      { id: "dashboard", label: "Dashboard" },
-      { id: "niche", label: "Niche" },
-      { id: "book", label: "Books" },
-      { id: "cover", label: "Cover" },
-      { id: "ai", label: "AI" },
-      { id: "account", label: "Account" },
+      { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { id: "niche", label: "Niches", icon: Target },
+      { id: "book", label: "Books", icon: BookOpen },
+      { id: "competition", label: "Competition", icon: Swords },
+      { id: "trends", label: "Trends", icon: Flame },
+      { id: "saved", label: "Saved", icon: Bookmark },
+      { id: "cover", label: "Cover", icon: Paintbrush },
+      { id: "ai", label: "AI", icon: Bot },
+      { id: "billing", label: "Plans", icon: CreditCard },
+      { id: "account", label: "Account", icon: Shield },
+      ...(user?.role === "admin" ? [{ id: "admin", label: "Admin", icon: Server }] : []),
     ] as const;
 
     const content = (() => {
@@ -524,65 +531,125 @@ function MainApp() {
           return <NicheResearchView />;
         case "book":
           return <BookResearchView />;
+        case "competition":
+          return <CompetitionAnalysisView />;
+        case "trends":
+          return <TrendingResearchView />;
+        case "saved":
+          return (
+            <SavedResearchView
+              onNavigateToNiche={() => setActiveTab("niche")}
+              onNavigateToBook={() => setActiveTab("book")}
+              onNavigateToKeyword={() => setActiveTab("book")}
+            />
+          );
         case "cover":
           return <CoverDesignerView />;
         case "ai":
           return <AiAssistantView />;
+        case "billing":
+          return <SubscriptionView />;
+        case "admin":
+          return <AdminDashboardView />;
         case "account":
           return <ProfileAndSecurityView />;
         case "dashboard":
         default:
-          return <DashboardView />;
+          return (
+            <DashboardView
+              onNavigateToNiche={() => setActiveTab("niche")}
+              onNavigateToBook={() => setActiveTab("book")}
+            />
+          );
       }
     })();
 
     return (
-      <div className="min-h-screen bg-slate-950 text-white">
-        <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/75 backdrop-blur-xl">
+      <div className={`min-h-screen transition-colors duration-200 ${theme === "dark" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}>
+        <header className={`sticky top-0 z-40 border-b backdrop-blur-xl transition-colors ${
+          theme === "dark" ? "border-white/10 bg-slate-950/80" : "border-slate-200 bg-white/85"
+        }`}>
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8">
             <button
               type="button"
               onClick={() => setActiveTab("dashboard")}
-              className="flex items-center gap-3"
+              className="flex items-center gap-3 cursor-pointer shrink-0"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-emerald-400 to-sky-500 text-slate-950 shadow-lg shadow-emerald-500/20">
                 <BookOpen className="h-4 w-4" />
               </div>
-              <div className="text-left">
-                <div className="text-base font-bold tracking-tight text-white">
+              <div className="text-left hidden sm:block">
+                <div className={`text-base font-bold tracking-tight ${theme === "dark" ? "text-white" : "text-slate-900"}`}>
                   {BRAND_CONFIG.name}
                 </div>
-                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-300">
+                <div className={`text-[10px] uppercase tracking-[0.2em] ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>
                   Publishing workflow
                 </div>
               </div>
             </button>
 
-            <nav className="hidden flex-1 items-center justify-center gap-2 overflow-x-auto md:flex">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleTabChange(item.id as any)}
-                  className={`rounded-full px-3 py-2 text-sm transition ${activeTab === item.id ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <nav className="hidden flex-1 items-center justify-center gap-1.5 overflow-x-auto md:flex px-2">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleTabChange(item.id as any)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                      isActive
+                        ? theme === "dark"
+                          ? "bg-white/10 text-white shadow-xs"
+                          : "bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-xs"
+                        : theme === "dark"
+                          ? "text-slate-300 hover:bg-white/5 hover:text-white"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {item.label}
+                  </button>
+                );
+              })}
             </nav>
 
             <div className="flex items-center gap-2">
+              {/* Theme Toggle Button */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition cursor-pointer ${
+                  theme === "dark"
+                    ? "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 hover:text-white"
+                    : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+
               <button
                 type="button"
                 onClick={logout}
-                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-2 text-sm text-slate-100"
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm transition cursor-pointer ${
+                  theme === "dark"
+                    ? "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                    : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
               >
                 <LogOut className="h-4 w-4" /> Logout
               </button>
+
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((open) => !open)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 md:hidden"
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border md:hidden cursor-pointer ${
+                  theme === "dark"
+                    ? "border-white/10 bg-white/5 text-slate-200"
+                    : "border-slate-200 bg-slate-100 text-slate-700"
+                }`}
               >
                 <Menu className="h-4 w-4" />
               </button>
@@ -590,49 +657,77 @@ function MainApp() {
           </div>
 
           {mobileMenuOpen && (
-            <div className="border-t border-white/10 bg-slate-950/90 md:hidden">
+            <div className={`border-t md:hidden transition-colors ${
+              theme === "dark" ? "border-white/10 bg-slate-950/95" : "border-slate-200 bg-white/95"
+            }`}>
               <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-2">
-                {navItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => handleTabChange(item.id as any)}
-                    className={`rounded-xl px-3 py-2 text-left text-sm ${activeTab === item.id ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5"}`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleTabChange(item.id as any)}
+                      className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition cursor-pointer ${
+                        isActive
+                          ? theme === "dark"
+                            ? "bg-white/10 text-white"
+                            : "bg-indigo-50 text-indigo-700 font-semibold"
+                          : theme === "dark"
+                            ? "text-slate-300 hover:bg-white/5"
+                            : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {item.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
         </header>
 
         <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          {content}
+          <Suspense fallback={<PageLoader />}>
+            {content}
+          </Suspense>
         </main>
       </div>
     );
   };
 
+  if (authModalOpen && !user) {
+    return (
+      <AuthPage
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authModalMode}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className={`min-h-screen transition-colors duration-200 ${theme === "dark" ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}>
       {!user ? (
         <>
-          <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/75 backdrop-blur-xl">
+          <header className={`sticky top-0 z-40 border-b backdrop-blur-xl transition-colors ${
+            theme === "dark" ? "border-white/10 bg-slate-950/75" : "border-slate-200 bg-white/80"
+          }`}>
             <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 lg:px-8">
               <button
                 type="button"
                 onClick={() => setLandingPage("home")}
-                className="flex items-center gap-3"
+                className="flex items-center gap-3 cursor-pointer"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-emerald-400 to-sky-500 text-slate-950 shadow-lg shadow-emerald-500/20">
                   <BookOpen className="h-4 w-4" />
                 </div>
                 <div className="text-left">
-                  <div className="text-base font-bold tracking-tight text-white">
+                  <div className={`text-base font-bold tracking-tight ${theme === "dark" ? "text-white" : "text-slate-900"}`}>
                     {BRAND_CONFIG.name}
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-slate-300">
+                  <div className={`text-[10px] uppercase tracking-[0.2em] ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>
                     Futuristic publishing
                   </div>
                 </div>
@@ -644,7 +739,11 @@ function MainApp() {
                     key={page.key}
                     type="button"
                     onClick={() => setLandingPage(page.key)}
-                    className={`rounded-full px-3 py-2 text-sm transition ${landingPage === page.key ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}
+                    className={`rounded-full px-3 py-2 text-sm transition cursor-pointer ${
+                      landingPage === page.key
+                        ? theme === "dark" ? "bg-white/10 text-white" : "bg-slate-200 text-slate-900 font-semibold"
+                        : theme === "dark" ? "text-slate-300 hover:bg-white/5 hover:text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    }`}
                   >
                     {page.label}
                   </button>
@@ -652,17 +751,36 @@ function MainApp() {
               </nav>
 
               <div className="flex items-center gap-2">
+                {/* Theme Toggle Button */}
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition cursor-pointer ${
+                    theme === "dark"
+                      ? "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 hover:text-white"
+                      : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                  title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                  aria-label="Toggle theme"
+                >
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => openAuth("login")}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-2 text-sm text-slate-100"
+                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm transition cursor-pointer ${
+                    theme === "dark"
+                      ? "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                      : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
                 >
                   <LogIn className="h-4 w-4" /> Sign in
                 </button>
                 <button
                   type="button"
                   onClick={() => openAuth("register")}
-                  className="hidden items-center gap-2 rounded-full bg-linear-to-r from-emerald-400 to-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 sm:inline-flex"
+                  className="hidden items-center gap-2 rounded-full bg-linear-to-r from-emerald-400 to-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 sm:inline-flex cursor-pointer"
                 >
                   <UserPlus className="h-3.5 w-3.5" /> Create Account
                 </button>
@@ -681,23 +799,19 @@ function MainApp() {
       ) : (
         renderAuthenticatedApp()
       )}
-
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        initialMode={authModalMode}
-      />
     </div>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <SubscriptionProvider>
-        <MainApp />
-      </SubscriptionProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <MainApp />
+        </SubscriptionProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

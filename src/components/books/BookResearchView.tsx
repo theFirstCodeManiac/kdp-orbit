@@ -46,7 +46,32 @@ export const BookResearchView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedAsins, setSavedAsins] = useState<Set<string>>(new Set());
+  const [savedItemsMap, setSavedItemsMap] = useState<Map<string, string>>(new Map());
+
+  // Load user's saved items to reflect saved status
+  useEffect(() => {
+    if (!token) return;
+    const fetchSaved = async () => {
+      try {
+        const res = await fetch("/api/saved/items?collectionId=all", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          const map = new Map<string, string>();
+          for (const item of json.data) {
+            if (item.meta?.asin) {
+              map.set(item.meta.asin, item.id);
+            }
+          }
+          setSavedItemsMap(map);
+        }
+      } catch (err) {
+        console.error("Failed to fetch saved items:", err);
+      }
+    };
+    fetchSaved();
+  }, [token]);
 
   const performSearch = useCallback(
     async (searchQuery: string, pageNum: number = 1) => {
@@ -115,24 +140,74 @@ export const BookResearchView: React.FC = () => {
     }
   }, [debouncedQuery, page, performSearch]);
 
-  const toggleSaveBook = (asin: string) => {
-    setSavedAsins((prev) => {
-      const next = new Set(prev);
-      if (next.has(asin)) {
-        next.delete(asin);
-      } else {
-        next.add(asin);
-        analytics.track(
-          "keyword_saved",
-          {
-            source: "book_research",
-            saved_type: "book",
-          },
-          user?.id,
-        );
+  const toggleSaveBook = async (book: BookOpportunity) => {
+    if (!token) return;
+    const isCurrentlySaved = savedItemsMap.has(book.asin);
+
+    if (isCurrentlySaved) {
+      const savedId = savedItemsMap.get(book.asin);
+      // Optimistic update
+      setSavedItemsMap((prev) => {
+        const next = new Map(prev);
+        next.delete(book.asin);
+        return next;
+      });
+
+      if (savedId) {
+        try {
+          await fetch(`/api/saved/items/${savedId}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } catch (err) {
+          console.error("Failed to remove saved book:", err);
+        }
       }
-      return next;
-    });
+    } else {
+      try {
+        const res = await fetch("/api/saved/items", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            type: "book",
+            title: book.title,
+            subtitle: `by ${book.author} • BSR #${book.bestSellerRank.toLocaleString()}`,
+            meta: {
+              asin: book.asin,
+              author: book.author,
+              priceUSD: book.priceUSD,
+              rating: book.rating,
+              reviewCount: book.reviewCount,
+              bestSellerRank: book.bestSellerRank,
+              estimatedMonthlySales: book.estimatedMonthlySales,
+              revenueEstUSD: book.revenueEstUSD,
+              categories: book.categories
+            }
+          })
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          setSavedItemsMap((prev) => {
+            const next = new Map(prev);
+            next.set(book.asin, json.data.id);
+            return next;
+          });
+          analytics.track(
+            "keyword_saved",
+            {
+              source: "book_research",
+              saved_type: "book",
+            },
+            user?.id,
+          );
+        }
+      } catch (err) {
+        console.error("Failed to save book:", err);
+      }
+    }
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -229,6 +304,47 @@ export const BookResearchView: React.FC = () => {
         </div>
       )}
 
+      {!hasSearched && !isLoading && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-12 text-center shadow-xs">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4">
+            <BookOpen className="h-8 w-8" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-800 mb-2">
+            Explore Amazon KDP Book Metrics
+          </h3>
+          <p className="text-slate-500 text-sm max-w-lg mx-auto mb-6 leading-relaxed">
+            Search any keyword, author name, or Amazon ASIN to inspect estimated monthly royalties, sales volume, BSR momentum, review count, and price distributions.
+          </p>
+          <div className="max-w-xl mx-auto">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+              Popular starting points
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {[
+                "Atomic Habits",
+                "Coloring book for kids",
+                "Daily gratitude journal",
+                "Python for beginners",
+                "Sudoku puzzle book",
+                "High protein meal prep"
+              ].map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onClick={() => {
+                    setQuery(term);
+                    performSearch(term, 1);
+                  }}
+                  className="px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 text-xs font-medium text-slate-600 transition cursor-pointer"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
@@ -243,7 +359,7 @@ export const BookResearchView: React.FC = () => {
       {!isLoading && results.length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {results.map((book) => {
-            const isSaved = savedAsins.has(book.asin);
+            const isSaved = savedItemsMap.has(book.asin);
 
             return (
               <div
@@ -272,7 +388,7 @@ export const BookResearchView: React.FC = () => {
                     </div>
 
                     <button
-                      onClick={() => toggleSaveBook(book.asin)}
+                      onClick={() => toggleSaveBook(book)}
                       className={`shrink-0 p-2 rounded-full transition ${isSaved ? "bg-indigo-100 text-indigo-700" : "bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}
                       title={isSaved ? "Remove from saved" : "Save for later"}
                     >

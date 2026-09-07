@@ -84,7 +84,7 @@ filesRouter.post('/upload', requireAuth, (req: AuthenticatedRequest, res: Respon
 });
 
 // Download/View file
-filesRouter.get('/:fileId', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+filesRouter.get('/:fileId', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const { fileId } = req.params;
   const userId = req.user!.id;
 

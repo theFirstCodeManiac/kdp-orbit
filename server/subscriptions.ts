@@ -25,8 +25,8 @@ export const availablePlans: SubscriptionPlan[] = PRICING_CONFIG.plans.map(
   }),
 );
 
-export function resolveUserEntitlements(userId: string) {
-  const billingInfo = db.billingRecords.get(userId);
+export async function resolveUserEntitlements(userId: string) {
+  const billingInfo = await db.getBillingRecord(userId);
 
   if (!billingInfo) {
     // Return default free tier if no billing record exists
@@ -107,10 +107,10 @@ export function resolveUserEntitlements(userId: string) {
 subscriptionsRouter.get(
   "/me",
   requireAuth,
-  (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user!.id;
-    const billingInfo = db.billingRecords.get(userId);
-    const entitlements = resolveUserEntitlements(userId);
+    const billingInfo = await db.getBillingRecord(userId);
+    const entitlements = await resolveUserEntitlements(userId);
 
     res.json({
       success: true,

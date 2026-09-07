@@ -209,6 +209,33 @@ export const AiAssistantView: React.FC = () => {
               )}
             </div>
           ))}
+
+          {messages.length === 1 && (
+            <div className="pt-2">
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                Suggested questions & workflows
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {[
+                  "Suggest 5 underserved low-competition nonfiction niches",
+                  "7 high-converting backend keywords for a mindfulness journal",
+                  "Generate a catchy title and subtitle for a productivity guide",
+                  "What are the essential KDP cover formatting requirements?"
+                ].map((promptText) => (
+                  <button
+                    key={promptText}
+                    type="button"
+                    onClick={() => {
+                      setInput(promptText);
+                    }}
+                    className="text-left p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 text-xs text-slate-700 font-medium transition cursor-pointer"
+                  >
+                    "{promptText}"
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {isLoading && (
             <div className="flex gap-4 justify-start">
               <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">

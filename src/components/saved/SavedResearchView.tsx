@@ -22,11 +22,12 @@ interface SavedItem {
 }
 
 interface SavedResearchViewProps {
-  onNavigateToNiche: () => void;
-  onNavigateToBook: () => void;
+  onNavigateToNiche?: () => void;
+  onNavigateToBook?: () => void;
+  onNavigateToKeyword?: () => void;
 }
 
-export const SavedResearchView: React.FC<SavedResearchViewProps> = ({ onNavigateToNiche, onNavigateToBook }) => {
+export const SavedResearchView: React.FC<SavedResearchViewProps> = ({ onNavigateToNiche, onNavigateToBook, onNavigateToKeyword }) => {
   const { token } = useAuth();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [items, setItems] = useState<SavedItem[]>([]);
@@ -255,25 +256,31 @@ export const SavedResearchView: React.FC<SavedResearchViewProps> = ({ onNavigate
               ))}
             </div>
           ) : filteredItems.length === 0 ? (
-            <div className="text-center py-20 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-              <Folder className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-lg font-bold text-slate-700">You haven't saved any items yet</h3>
+            <div className="text-center py-16 px-4 bg-white border border-slate-200 border-dashed rounded-2xl shadow-xs">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4">
+                <Folder className="h-7 w-7" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">
+                {activeCollectionId === 'keywords' ? "You haven't saved any keywords yet" : "You haven't saved any research yet"}
+              </h3>
               <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto mb-6">
-                {searchQuery ? "No items match your search." : "Research a keyword or niche and save useful opportunities here."}
+                {searchQuery ? "No items match your search filter." : "Research a keyword and save useful opportunities here."}
               </p>
               {!searchQuery && (
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-3">
                   <button 
-                    onClick={onNavigateToNiche}
-                    className="px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition text-sm"
+                    onClick={onNavigateToKeyword || onNavigateToBook}
+                    className="px-5 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition text-sm shadow-xs flex items-center gap-2 cursor-pointer"
                   >
-                    Research Niches
+                    <Search className="h-4 w-4" />
+                    Research Keywords
                   </button>
                   <button 
-                    onClick={onNavigateToBook}
-                    className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition text-sm"
+                    onClick={onNavigateToNiche}
+                    className="px-5 py-2.5 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition text-sm shadow-xs flex items-center gap-2 cursor-pointer"
                   >
-                    Research Books
+                    <Target className="h-4 w-4" />
+                    Research Niches
                   </button>
                 </div>
               )}

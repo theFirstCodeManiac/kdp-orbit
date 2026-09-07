@@ -75,7 +75,7 @@ I do not have access to real-time Amazon BSR or search volume statistics. Howeve
     while (currentTry < maxRetries) {
       try {
         response = await aiClient.models.generateContent({
-            model: 'gemini-3.6-flash',
+            model: 'gemini-3.8-flash',
             contents: [...history, currentMessage],
             config: {
                 systemInstruction,

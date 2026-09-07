@@ -5,12 +5,12 @@ import { db } from './db.ts';
 export const adminRouter = express.Router();
 
 // 1. Get System Stats
-adminRouter.get('/stats', requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const totalUsers = db.users.size;
+adminRouter.get('/stats', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const totalUsers = (await db.getUserCount());
   let activeSubscriptions = 0;
   let totalRevenue = 0;
 
-  for (const billing of db.billingRecords.values()) {
+  for (const billing of (await db.getAllBillingRecords())) {
     if (billing.status === 'active' && billing.planId !== 'free_starter') {
       activeSubscriptions++;
       // Rough revenue estimate ignoring currency conversions for simplicity
@@ -18,7 +18,7 @@ adminRouter.get('/stats', requireAdmin, (req: AuthenticatedRequest, res: Respons
     }
   }
 
-  const recentUsers = Array.from(db.users.values())
+  const recentUsers = Array.from((await db.getAllUsers()))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 10)
     .map(u => db.sanitizeUser(u));
@@ -37,20 +37,21 @@ adminRouter.get('/stats', requireAdmin, (req: AuthenticatedRequest, res: Respons
 });
 
 // 2. Get All Users
-adminRouter.get('/users', requireAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const users = Array.from(db.users.values()).map(u => {
-    const billing = db.billingRecords.get(u.id);
+adminRouter.get('/users', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const allUsers = await db.getAllUsers();
+  const users = await Promise.all(Array.from(allUsers).map(async (u) => {
+    const billing = await db.getBillingRecord(u.id);
     return {
       ...db.sanitizeUser(u),
       billing: billing || null
     };
-  });
+    }));
   
   res.json({ success: true, data: { users } });
 });
 
 // 3. Admin User Action: Update Subscription / Grant Access
-adminRouter.post('/users/:id/subscription', requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+adminRouter.post('/users/:id/subscription', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   const targetUserId = req.params.id;
   const { action, days } = req.body; // action: 'grant_early_access', 'grant_lifetime', 'revoke_access'
 
@@ -62,12 +63,12 @@ adminRouter.post('/users/:id/subscription', requireAdmin, (req: AuthenticatedReq
     return res.status(400).json({ success: false, error: 'Invalid action' });
   }
 
-  const user = db.findUserById(targetUserId);
+  const user = await db.findUserById(targetUserId);
   if (!user) {
     return res.status(404).json({ success: false, error: 'User not found' });
   }
 
-  let billing = db.billingRecords.get(targetUserId);
+  let billing = await db.getBillingRecord(targetUserId);
   if (!billing) {
     billing = {
       userId: targetUserId,
@@ -89,7 +90,7 @@ adminRouter.post('/users/:id/subscription', requireAdmin, (req: AuthenticatedReq
       nextBillingDate: null,
       invoices: []
     };
-    db.billingRecords.set(targetUserId, billing);
+    await db.setBillingRecord(targetUserId, billing);
   }
 
   if (action === 'grant_early_access') {
@@ -131,18 +132,18 @@ adminRouter.post('/users/:id/subscription', requireAdmin, (req: AuthenticatedReq
 });
 
 // 4. Get System Audit Logs
-adminRouter.get('/audit-logs', requireAdmin, (req: AuthenticatedRequest, res: Response) => {
+adminRouter.get('/audit-logs', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
   const allLogs: any[] = [];
   
-  for (const billing of db.billingRecords.values()) {
+  for (const billing of (await db.getAllBillingRecords())) {
     if (billing.auditLog && billing.auditLog.length > 0) {
-      billing.auditLog.forEach(log => {
+      for (const log of billing.auditLog) {
         allLogs.push({
           userId: billing.userId,
-          userEmail: db.findUserById(billing.userId)?.email || 'Unknown',
+          userEmail: (await db.findUserById(billing.userId))?.email || 'Unknown',
           ...log
         });
-      });
+      }
     }
   }
 

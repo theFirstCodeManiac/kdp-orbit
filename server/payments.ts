@@ -170,7 +170,7 @@ paymentsRouter.post(
       const userId = req.user!.id;
       const { planId, billingCycle } = req.body;
 
-      const user = db.findUserById(userId);
+      const user = await db.findUserById(userId);
       if (!user)
         return res
           .status(404)
@@ -210,7 +210,7 @@ paymentsRouter.post(
 
       // Record pending transaction
       const transactionId = crypto.randomUUID();
-      db.paymentTransactions.set(transactionId, {
+      await db.setPaymentTransaction(transactionId, {
         id: transactionId,
         userId,
         provider: provider.name,
@@ -246,7 +246,7 @@ paymentsRouter.get("/verify", async (req: Request, res: Response) => {
 
     // Find the transaction in DB
     let tx: DBPaymentTransaction | undefined;
-    for (const t of db.paymentTransactions.values()) {
+    for (const t of (await db.getAllPaymentTransactions())) {
       if (t.reference === reference) {
         tx = t;
         break;
@@ -269,7 +269,7 @@ paymentsRouter.get("/verify", async (req: Request, res: Response) => {
       tx.updatedAt = new Date().toISOString();
 
       // Upgrade user plan
-      applySubscriptionUpgrade(tx);
+      await applySubscriptionUpgrade(tx);
 
       return res.redirect("/?payment=success");
     } else {
@@ -298,13 +298,13 @@ paymentsRouter.post(
 
       if (result) {
         // 1. Idempotency Check: Have we processed this webhook event before?
-        if (db.webhookEvents.has(result.eventId)) {
+        if (await db.hasWebhookEvent(result.eventId)) {
           console.log(`[Webhook] Duplicate event ignored: ${result.eventId}`);
           return res.status(200).send("Already processed");
         }
 
         // 2. Mark event as processed immediately
-        db.webhookEvents.set(result.eventId, {
+        await db.setWebhookEvent(result.eventId, {
           eventId: result.eventId,
           provider: provider.name,
           eventType: result.type,
@@ -313,7 +313,7 @@ paymentsRouter.post(
 
         // 3. Find associated transaction
         let tx: DBPaymentTransaction | undefined;
-        for (const t of db.paymentTransactions.values()) {
+        for (const t of (await db.getAllPaymentTransactions())) {
           if (t.reference === result.reference) {
             tx = t;
             break;
@@ -327,7 +327,7 @@ paymentsRouter.post(
         ) {
           tx.status = "successful";
           tx.updatedAt = new Date().toISOString();
-          applySubscriptionUpgrade(tx);
+          await applySubscriptionUpgrade(tx);
         }
       }
 
@@ -339,8 +339,8 @@ paymentsRouter.post(
   },
 );
 
-function applySubscriptionUpgrade(tx: DBPaymentTransaction) {
-  let billingInfo = db.billingRecords.get(tx.userId);
+async function applySubscriptionUpgrade(tx: DBPaymentTransaction) {
+  let billingInfo = await db.getBillingRecord(tx.userId);
 
   if (!billingInfo) {
     billingInfo = {
@@ -367,7 +367,7 @@ function applySubscriptionUpgrade(tx: DBPaymentTransaction) {
         .split("T")[0],
       invoices: [],
     };
-    db.billingRecords.set(tx.userId, billingInfo);
+    await db.setBillingRecord(tx.userId, billingInfo);
   } else {
     billingInfo.planId = tx.planId;
     billingInfo.billingCycle = tx.billingCycle as any;
@@ -388,7 +388,7 @@ function applySubscriptionUpgrade(tx: DBPaymentTransaction) {
     details: `Upgraded to ${tx.planId} (${tx.billingCycle}) via ${tx.provider}. Ref: ${tx.reference}`,
   });
 
-  const user = db.findUserById(tx.userId);
+  const user = await db.findUserById(tx.userId);
   if (user) {
     user.planId = tx.planId as any;
   }

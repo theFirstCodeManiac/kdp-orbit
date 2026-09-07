@@ -114,15 +114,15 @@ dashboardRouter.get(
       const userId = user.id;
 
       // 1. Quota & Usage
-      let usage = db.usageRecords.get(userId);
+      let usage = await db.getUsageRecord(userId);
       if (!usage) {
         usage = getDefaultQuota(user.planId, userId);
-        db.usageRecords.set(userId, usage);
+        await db.setUsageRecord(userId, usage);
       }
 
       // 2. Billing & Subscription details
       const currentPlan = getPricingPlan(user.planId || "free_starter");
-      const billing = db.billingRecords.get(userId) || {
+      const billing = await db.getBillingRecord(userId) || {
         userId,
         planId: user.planId,
         status: "active",
@@ -135,7 +135,7 @@ dashboardRouter.get(
 
       // 3. Saved Niches (Filtered by userId and type='niche')
       const savedNiches: DBResearchItem[] = [];
-      for (const item of db.researchItems.values()) {
+      for (const item of (await db.getAllResearchItems())) {
         if (item.userId === userId && item.type === "niche") {
           savedNiches.push(item);
         }
@@ -148,7 +148,7 @@ dashboardRouter.get(
 
       // 4. Recent Searches (Filtered by userId)
       const recentSearches: DBRecentSearch[] = [];
-      for (const search of db.recentSearches.values()) {
+      for (const search of (await db.getAllRecentSearches())) {
         if (search.userId === userId) {
           recentSearches.push(search);
         }
@@ -160,7 +160,7 @@ dashboardRouter.get(
 
       // 5. Recent Cover Projects (Filtered by userId)
       const recentCovers: DBCoverProject[] = [];
-      for (const cover of db.coverProjects.values()) {
+      for (const cover of (await db.getAllCoverProjects())) {
         if (cover.userId === userId) {
           recentCovers.push(cover);
         }
@@ -329,7 +329,7 @@ dashboardRouter.post(
         }
 
         const searchId = "sea_" + Date.now();
-        db.recentSearches.set(searchId, {
+        await db.setRecentSearch(searchId, {
           id: searchId,
           userId: user.id,
           query: String(query).trim(),

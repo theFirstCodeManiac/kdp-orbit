@@ -6,7 +6,7 @@ import {
   getOnboardingProfile,
   OnboardingAnswers,
 } from "./OnboardingModal.tsx";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, Sparkles, ArrowRight } from "lucide-react";
 import {
   formatMoney,
   getLocaleForRegion,
@@ -273,6 +273,117 @@ export const DashboardView: React.FC<{
               / month
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Personalized Onboarding Plan & Recommendations */}
+      <div className="rounded-2xl border border-indigo-500/20 bg-linear-to-r from-indigo-950/40 via-slate-900 to-slate-900 p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-2">
+              <Sparkles className="h-3 w-3" />
+              Tailored for {onboarding?.experience || "Your"} KDP Journey
+            </div>
+            <h2 className="text-lg font-bold text-white">
+              Your Personalized Publishing Focus
+            </h2>
+            {onboarding?.bookTypes && (
+              <p className="text-xs text-slate-300 mt-0.5">
+                Target Category: <span className="font-semibold text-emerald-300">{onboarding.bookTypes}</span>
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setOnboardingOpen(true)}
+            className="text-xs font-semibold text-indigo-300 hover:text-indigo-200 underline decoration-indigo-500/40 underline-offset-4 transition self-start sm:self-center cursor-pointer"
+          >
+            Update preferences
+          </button>
+        </div>
+
+        <div className="grid gap-3 pt-4 sm:grid-cols-2 lg:grid-cols-3">
+          {(!onboarding?.goals || onboarding.goals.length === 0 || onboarding.goals.includes("Find profitable niches")) && (
+            <button
+              type="button"
+              onClick={() => handleOpenQuickAction("niche")}
+              className="group text-left p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:border-emerald-500/40 hover:bg-slate-950/70 transition cursor-pointer"
+            >
+              <div className="text-xs font-bold text-emerald-400 flex items-center justify-between">
+                <span>Niche Opportunity Scan</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                {onboarding?.experience === "Beginner"
+                  ? "Explore beginner-friendly niches with low competition scores."
+                  : "Target high-margin underserved angles with validated BSR demand."}
+              </p>
+            </button>
+          )}
+
+          {(!onboarding?.goals || onboarding.goals.length === 0 || onboarding.goals.includes("Research keywords")) && (
+            <button
+              type="button"
+              onClick={() => handleOpenQuickAction("keyword")}
+              className="group text-left p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:border-sky-500/40 hover:bg-slate-950/70 transition cursor-pointer"
+            >
+              <div className="text-xs font-bold text-sky-400 flex items-center justify-between">
+                <span>Keyword Demand Analyzer</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Surface search volume and buyer intent for your 7 KDP backend slots.
+              </p>
+            </button>
+          )}
+
+          {onboarding?.goals?.includes("Create covers") && (
+            <button
+              type="button"
+              onClick={() => handleOpenQuickAction("cover")}
+              className="group text-left p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:border-amber-500/40 hover:bg-slate-950/70 transition cursor-pointer"
+            >
+              <div className="text-xs font-bold text-amber-400 flex items-center justify-between">
+                <span>Cover Template Designer</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Design pixel-perfect paperback or hardcover wraps with precise spine calculations.
+              </p>
+            </button>
+          )}
+
+          {onboarding?.goals?.includes("Find book ideas") && (
+            <button
+              type="button"
+              onClick={() => handleOpenQuickAction("book")}
+              className="group text-left p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:border-purple-500/40 hover:bg-slate-950/70 transition cursor-pointer"
+            >
+              <div className="text-xs font-bold text-purple-400 flex items-center justify-between">
+                <span>Book Idea Generator</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Reverse engineer top performing titles and identify missing reader angles.
+              </p>
+            </button>
+          )}
+
+          {onboarding?.goals?.includes("Improve existing books") && (
+            <button
+              type="button"
+              onClick={() => handleOpenQuickAction("book")}
+              className="group text-left p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:border-indigo-400 hover:bg-slate-950/70 transition cursor-pointer"
+            >
+              <div className="text-xs font-bold text-indigo-300 flex items-center justify-between">
+                <span>Listing Optimization</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                Audit BSR, review trends, and upgrade keywords to revive sluggish sales.
+              </p>
+            </button>
+          )}
         </div>
       </div>
 

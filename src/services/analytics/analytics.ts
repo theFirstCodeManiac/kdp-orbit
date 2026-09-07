@@ -5,6 +5,7 @@ export type AnalyticsEventName =
   | "niche_viewed"
   | "book_analyzed"
   | "cover_created"
+  | "cover_saved"
   | "cover_exported"
   | "subscription_started"
   | "subscription_cancelled"

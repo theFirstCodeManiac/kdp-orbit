@@ -366,6 +366,60 @@ export const CompetitionAnalysisView: React.FC = () => {
           )}
         </div>
       )}
+
+      {!data && !isLoading && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-12 text-center shadow-xs">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 mb-4">
+            <Swords className="h-8 w-8" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-800 mb-2">
+            Analyze Market Competition & Saturation
+          </h3>
+          <p className="text-slate-500 text-sm max-w-lg mx-auto mb-6 leading-relaxed">
+            Uncover listing depth, average reviews, pricing sweet spots, publication velocity, and keyword overlap before creating your next KDP title.
+          </p>
+          <div className="max-w-xl mx-auto">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+              Explore competitive queries
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              {[
+                "Low carb cookbook",
+                "Stoicism daily reflections",
+                "Coloring book for toddlers",
+                "Shadow work journal",
+                "Sci-fi dystopian novel",
+                "Real estate investing guide"
+              ].map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onClick={() => {
+                    setQuery(term);
+                    if (token) {
+                      setIsLoading(true);
+                      setError(null);
+                      fetch(`/api/competition/analyze?query=${encodeURIComponent(term)}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                      })
+                        .then((r) => r.json())
+                        .then((json) => {
+                          if (json.success) setData(json.data);
+                          else setError(json.error?.message || "Analysis failed");
+                        })
+                        .catch(() => setError("Failed to analyze keyword"))
+                        .finally(() => setIsLoading(false));
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700 text-xs font-medium text-slate-600 transition cursor-pointer"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
