@@ -52,13 +52,15 @@ async function startServer() {
     }),
   );
 
+  const frontendUrl = process.env.FRONTEND_URL;
+  if (process.env.NODE_ENV === "production" && !frontendUrl) {
+    throw new Error("FRONTEND_URL environment variable is required in production.");
+  }
+
   // 2. CORS Restriction
   app.use(
     cors({
-      origin:
-        process.env.NODE_ENV === "production"
-          ? process.env.FRONTEND_URL || true
-          : true,
+      origin: process.env.NODE_ENV === "production" ? frontendUrl : true,
       credentials: true,
     }),
   );
